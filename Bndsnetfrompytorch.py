@@ -1,3 +1,5 @@
+import sys
+sys.path.append('C:\\Users\\wbott')
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,6 +15,8 @@ import argparse
 from time import time as t
 from torchvision import transforms
 from tqdm import tqdm
+from typing import Iterable, List, Optional, Sequence, Tuple, Union
+from bindsnet.learning import PostPre
 
 #from https://github.com/BindsNET/bindsnet/blob/master/examples/mnist/eth_mnist.py
 from bindsnet.analysis.plotting import (
@@ -30,7 +34,8 @@ from bindsnet.models import DiehlAndCook2015
 from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
 from bindsnet.network import Network
-from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes, Softmax
+from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes, IFNodes#, Softmax
+from bindsnet.network.topology import Connection
 
 
 verbose = False
@@ -272,7 +277,13 @@ gpu = args.gpu
 
 # Sets up Gpu use
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+if gpu:
+    print("gpu")
+if torch.cuda.is_available():
+    print("cuda")
 if gpu and torch.cuda.is_available():
+    print("gpu")
     torch.cuda.manual_seed_all(seed)
 else:
     torch.manual_seed(seed)
@@ -291,35 +302,147 @@ if not train:
 n_sqrt = int(np.ceil(np.sqrt(n_neurons)))
 start_intensity = intensity
 
-# Build network.
-network = Network()
 
-input_layer = Input(n=input_size)
-lif_layer = LIFNodes(n=n_neurons)
-softmax_layer = Softmax(n=n_neurons)
 
-network.add_layer(input_layer, name="input_layer")
-network.add_layer(lif_layer, name="lif_layer")
-network.add_layer(softmax_layer, name="softmax_layer")
+# input_layer = Input(n=input_size, traces=True, tc_trace=20.0)
+# lif_layer = LIFNodes(n=n_neurons)
+# #softmax_layer = Softmax(n=n_neurons)
+# output_layer = IFNodes(n=output_size)
 
-# Connect layers.
-network.add_connection(source="input_layer", target="lif_layer")
-network.add_connection(source="lif_layer", target="softmax_layer")
-# Directs network to GPU
-if gpu:
-    network.to("cuda")
+# #https://www.frontiersin.org/files/Articles/409297/fninf-12-00089-HTML/image_m/fninf-12-00089-g005.jpg
 
+# network.add_layer(input_layer, name="input_layer")
+# network.add_layer(lif_layer, name="lif_layer")
+# network.add_layer(output_layer, name="output_layer")
+
+# # Connect layers.
+# input_connection = Connection(input_layer,lif_layer,norm=150, wmin=-1,wmax=1)
+# output_connection = Connection(lif_layer,output_layer,norm=150, wmin=-1,wmax=1)
+# network.add_connection(input_connection, source="input_layer", target="lif_layer")
+# network.add_connection(output_connection, source="lif_layer", target="output_layer")
+
+class mySNN(Network):
+    # language=rst
+    """
+    Slightly modifies the spiking neural network architecture from `(Diehl & Cook 2015)
+    <https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full>`_ by removing
+    the inhibitory layer and replacing it with a recurrent inhibitory connection in the
+    output layer (what used to be the excitatory layer).
+    """
+
+    def __init__(
+        self,
+        n_inpt: int,
+        n_neurons: int = 100,
+        inh: float = 17.5,
+        dt: float = 1.0,
+        nu: Optional[Union[float, Sequence[float]]] = (1e-4, 1e-2),
+        reduction: Optional[callable] = None,
+        wmin: Optional[float] = 0.0,
+        wmax: Optional[float] = 1.0,
+        norm: float = 78.4,
+        theta_plus: float = 0.05,
+        tc_theta_decay: float = 1e7,
+        inpt_shape: Optional[Iterable[int]] = None,
+        exc_thresh: float = -52.0,
+    ) -> None:
+        # language=rst
+        """
+        Constructor for class ``DiehlAndCook2015v2``.
+
+        :param n_inpt: Number of input neurons. Matches the 1D size of the input data.
+        :param n_neurons: Number of excitatory, inhibitory neurons.
+        :param inh: Strength of synapse weights from inhibitory to excitatory layer.
+        :param dt: Simulation time step.
+        :param nu: Single or pair of learning rates for pre- and post-synaptic events,
+            respectively.
+        :param reduction: Method for reducing parameter updates along the minibatch
+            dimension.
+        :param wmin: Minimum allowed weight on input to excitatory synapses.
+        :param wmax: Maximum allowed weight on input to excitatory synapses.
+        :param norm: Input to excitatory layer connection weights normalization
+            constant.
+        :param theta_plus: On-spike increment of ``DiehlAndCookNodes`` membrane
+            threshold potential.
+        :param tc_theta_decay: Time constant of ``DiehlAndCookNodes`` threshold
+            potential decay.
+        :param inpt_shape: The dimensionality of the input layer.
+        """
+        super().__init__(dt=dt)
+
+        self.n_inpt = n_inpt
+        self.inpt_shape = inpt_shape
+        self.n_neurons = n_neurons
+        self.inh = inh
+        self.dt = dt
+
+        input_layer = Input(
+            n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
+        )
+        self.add_layer(input_layer, name="X")
+
+        output_layer = DiehlAndCookNodes(
+            n=self.n_neurons,
+            traces=True,
+            rest=-65.0,
+            reset=-60.0,
+            thresh=exc_thresh,
+            refrac=5,
+            tc_decay=100.0,
+            tc_trace=20.0,
+            theta_plus=theta_plus,
+            tc_theta_decay=tc_theta_decay,
+        )
+        self.add_layer(output_layer, name="Y")
+
+        w = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
+        input_connection = Connection(
+            source=self.layers["X"],
+            target=self.layers["Y"],
+            w=w,
+            update_rule=PostPre,
+            nu=nu,
+            reduction=reduction,
+            wmin=wmin,
+            wmax=wmax,
+            norm=norm,
+        )
+        self.add_connection(input_connection, source="X", target="Y")
+
+        w = -self.inh * (
+            torch.ones(self.n_neurons, self.n_neurons)
+            - torch.diag(torch.ones(self.n_neurons))
+        )
+        recurrent_connection = Connection(
+            source=self.layers["Y"],
+            target=self.layers["Y"],
+            w=w,
+            wmin=-self.inh,
+            wmax=0,
+        )
+        self.add_connection(recurrent_connection, source="Y", target="Y")
+        
 # Load MNIST data.
 train_dataset = MNIST(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "data", "MNIST"),
+    root=os.path.join("..", "..","..", "data", "MNIST"),
     download=True,
     train=True,
     transform=transforms.Compose(
         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     ),
 )
+        
+# Build network.
+network = mySNN(n_inpt=784, inpt_shape=(1,28,28))
+
+# Directs network to GPU
+if gpu:
+    print("gpu")
+    network.to("cuda")
+
+
 
 # Record spikes during the simulation.
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
@@ -335,13 +458,13 @@ accuracy = {"all": [], "proportion": []}
 
 # # Voltage recording for excitatory and inhibitory layers.
 # exc_voltage_monitor = Monitor(
-#     network.layers["Ae"], ["v"], time=int(time / dt), device=device
+#     network.layers["X"], ["v"], time=int(time / dt), device=device
 # )
-# inh_voltage_monitor = Monitor(
-#     network.layers["Ai"], ["v"], time=int(time / dt), device=device
-# )
+inh_voltage_monitor = Monitor(
+    network.layers["Y"], ["v"], time=int(time / dt), device=device
+)
 # network.add_monitor(exc_voltage_monitor, name="exc_voltage")
-# network.add_monitor(inh_voltage_monitor, name="inh_voltage")
+network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 
 # Set up monitors for spikes and voltages
 spikes = {}
@@ -453,31 +576,31 @@ for epoch in range(n_epochs):
         # inh_voltages = inh_voltage_monitor.get("v")
 
         # Add to spikes recording.
-        spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
+        # spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
 
-        # Optionally plot various simulation information.
-        if plot:
-            image = batch["image"].view(28, 28)
-            inpt = inputs["X"].view(time, 784).sum(0).view(28, 28)
-            input_exc_weights = network.connections[("X", "Ae")].w
-            square_weights = get_square_weights(
-                input_exc_weights.view(784, n_neurons), n_sqrt, 28
-            )
-            square_assignments = get_square_assignments(assignments, n_sqrt)
-            spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
-            voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
-            inpt_axes, inpt_ims = plot_input(
-                image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
-            )
-            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
-            weights_im = plot_weights(square_weights, im=weights_im)
-            assigns_im = plot_assignments(square_assignments, im=assigns_im)
-            perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
-            voltage_ims, voltage_axes = plot_voltages(
-                voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-            )
+        # # Optionally plot various simulation information.
+        # if plot:
+        #     image = batch["image"].view(28, 28)
+        #     inpt = inputs["X"].view(time, 784).sum(0).view(28, 28)
+        #     input_exc_weights = network.connections[("X", "Ae")].w
+        #     square_weights = get_square_weights(
+        #         input_exc_weights.view(784, n_neurons), n_sqrt, 28
+        #     )
+        #     square_assignments = get_square_assignments(assignments, n_sqrt)
+        #     spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+        #     # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
+        #     inpt_axes, inpt_ims = plot_input(
+        #         image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
+        #     )
+        #     spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
+        #     weights_im = plot_weights(square_weights, im=weights_im)
+        #     assigns_im = plot_assignments(square_assignments, im=assigns_im)
+        #     perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
+        #     voltage_ims, voltage_axes = plot_voltages(
+        #         voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+        #     )
 
-            plt.pause(1e-8)
+        #     plt.pause(1e-8)
 
         network.reset_state_variables()  # Reset state variables.
 
@@ -488,7 +611,7 @@ print("Training complete.\n")
 test_dataset = MNIST(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "data", "MNIST"),
+    root=os.path.join("..", "..","..", "data", "MNIST"),
     download=True,
     train=False,
     transform=transforms.Compose(
@@ -520,7 +643,7 @@ for step, batch in enumerate(test_dataset):
     network.run(inputs=inputs, time=time)
 
     # Add to spikes recording.
-    spike_record[0] = spikes["Ae"].get("s").squeeze()
+    # spike_record[0] = spikes["Ae"].get("s").squeeze()
 
     # Convert the array of labels into a tensor
     label_tensor = torch.tensor(batch["label"], device=device)

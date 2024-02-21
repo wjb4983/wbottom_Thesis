@@ -37,7 +37,7 @@ from bindsnet.network import Network
 from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes, IFNodes#, Softmax
 from bindsnet.network.topology import Connection
 
-
+print(torch.__version__)
 verbose = False
 
 class CustomHidden(nn.Module):
@@ -193,8 +193,8 @@ def reset_random_seeds(n):
     np.random.seed(n)
     random.seed(n)
 
-
-reset_random_seeds(40)
+n=41
+reset_random_seeds(n)
 
 # For our runs with everything going:
 # This will be set up as [numhidden, nunm_children_per_node]
@@ -234,11 +234,11 @@ output_size = len(set(y_train_IRIS))
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--seed", type=int, default=0)
+parser.add_argument("--seed", type=int, default=n)
 parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--n_epochs", type=int, default=1)
+parser.add_argument("--n_epochs", type=int, default=2)
 parser.add_argument("--n_test", type=int, default=100)
-parser.add_argument("--n_train", type=int, default=60)
+parser.add_argument("--n_train", type=int, default=6000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -246,7 +246,7 @@ parser.add_argument("--theta_plus", type=float, default=0.05)
 parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
-parser.add_argument("--progress_interval", type=int, default=10)
+parser.add_argument("--progress_interval", type=int, default=100)
 parser.add_argument("--update_interval", type=int, default=250)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
@@ -277,19 +277,7 @@ gpu = args.gpu
 
 # Sets up Gpu use
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
-if gpu:
-    print("gpu")
-if torch.cuda.is_available():
-    print("cuda")
-if gpu and torch.cuda.is_available():
-    print("gpu")
-    torch.cuda.manual_seed_all(seed)
-else:
-    torch.manual_seed(seed)
-    device = "cpu"
-    if gpu:
-        gpu = False
+
         
         
 # Determines number of workers to use
@@ -436,6 +424,11 @@ train_dataset = MNIST(
         
 # Build network.
 network = mySNN(n_inpt=784, inpt_shape=(1,28,28))
+if os.path.isfile("bindsnet_model.pth"):
+    print("=======================================\nUsing pth found on your computer\n============================")
+    network.load_state_dict(torch.load('bindsnet_model.pth'))
+else:
+    print("=======================================\nCreating new model\n============================")
 
 # Directs network to GPU
 if gpu:
@@ -674,6 +667,8 @@ print("Proportion weighting accuracy: %.2f \n" % (accuracy["proportion"] / n_tes
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
+
+torch.save(network.state_dict(), 'bindsnet_model.pth')
 
 # Extract biases
 hidden_biases = network.layers[0].bias.detach().numpy()

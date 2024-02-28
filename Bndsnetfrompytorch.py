@@ -37,7 +37,6 @@ from bindsnet.network import Network
 from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes, IFNodes#, Softmax
 from bindsnet.network.topology import Connection
 
-print(torch.__version__)
 verbose = False
 
 class CustomHidden(nn.Module):
@@ -196,49 +195,15 @@ def reset_random_seeds(n):
 n=41
 reset_random_seeds(n)
 
-# For our runs with everything going:
-# This will be set up as [numhidden, nunm_children_per_node]
-# We will run this loop on all 3 datasets
-loop_iter = [[4,2], [4,4], [16,2], [16,4], [32, 2], [64, 2], [128, 2], [256,2], [512,2]]
 
-#set up vascular tree w/ params
-# The number of hidden nodes that the classifier will have
-# Note it will only have one layer for now
-numhidden = 16
-
-num_children_per_node = 2
-
-vascular_tree = VascularTree(numhidden, num_children_per_node)
-
-####################################################################
-##need to train classifier to extract biases from:::
-    ################################################################
-    
-# Load Iris dataset
-iris = datasets.load_iris()
-X = iris.data
-y = iris.target
-
-# Split the dataset into training and testing sets
-X_train_IRIS, X_test_IRIS, y_train_IRIS, y_test_IRIS = train_test_split(X, y, test_size=0.2, random_state=40)
-
-# Standardize the features
-scaler = StandardScaler()
-X_train_IRIS = scaler.fit_transform(X_train_IRIS)
-X_test_IRIS = scaler.transform(X_test_IRIS)
-
-
-# Create MLP without any vascular stuff and run tests
-input_size = X_train_IRIS.shape[1]
-output_size = len(set(y_train_IRIS))
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=n)
 parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--n_epochs", type=int, default=2)
-parser.add_argument("--n_test", type=int, default=100)
-parser.add_argument("--n_train", type=int, default=6000)
+parser.add_argument("--n_epochs", type=int, default=1)
+parser.add_argument("--n_test", type=int, default=1000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -246,9 +211,9 @@ parser.add_argument("--theta_plus", type=float, default=0.05)
 parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
-parser.add_argument("--progress_interval", type=int, default=100)
+parser.add_argument("--progress_interval", type=int, default=10)
 parser.add_argument("--update_interval", type=int, default=250)
-parser.add_argument("--train", dest="train", action="store_true")
+parser.add_argument("--train", dest="train", action="store_true")   
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
@@ -432,7 +397,6 @@ else:
 
 # Directs network to GPU
 if gpu:
-    print("gpu")
     network.to("cuda")
 
 
@@ -669,6 +633,42 @@ print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
 
 torch.save(network.state_dict(), 'bindsnet_model.pth')
+
+# For our runs with everything going:
+# This will be set up as [numhidden, nunm_children_per_node]
+# We will run this loop on all 3 datasets
+loop_iter = [[4,2], [4,4], [16,2], [16,4], [32, 2], [64, 2], [128, 2], [256,2], [512,2]]
+
+#set up vascular tree w/ params
+# The number of hidden nodes that the classifier will have
+# Note it will only have one layer for now
+numhidden = 16
+
+num_children_per_node = 2
+
+vascular_tree = VascularTree(numhidden, num_children_per_node)
+
+####################################################################
+##need to train classifier to extract biases from:::
+    ################################################################
+    
+# Load Iris dataset
+iris = datasets.load_iris()
+X = iris.data
+y = iris.target
+
+# Split the dataset into training and testing sets
+X_train_IRIS, X_test_IRIS, y_train_IRIS, y_test_IRIS = train_test_split(X, y, test_size=0.2, random_state=40)
+
+# Standardize the features
+scaler = StandardScaler()
+X_train_IRIS = scaler.fit_transform(X_train_IRIS)
+X_test_IRIS = scaler.transform(X_test_IRIS)
+
+
+# Create MLP without any vascular stuff and run tests
+input_size = X_train_IRIS.shape[1]
+output_size = len(set(y_train_IRIS))
 
 # Extract biases
 hidden_biases = network.layers[0].bias.detach().numpy()

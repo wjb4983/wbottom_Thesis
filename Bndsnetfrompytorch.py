@@ -38,6 +38,7 @@ from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes, IFNodes#,
 from bindsnet.network.topology import Connection
 
 verbose = False
+print(torch.__version__)
 
 class CustomHidden(nn.Module):
     def __init__(self, input_size, num_hidden, activation='sigmoid'):

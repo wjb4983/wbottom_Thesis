@@ -160,6 +160,7 @@ assigns_im = None
 perf_ax = None
 voltage_axes, voltage_ims = None, None
 
+
 # Train the network.
 print("\nBegin training.\n")
 start = t()
@@ -338,8 +339,8 @@ for step, batch in enumerate(test_dataset):
     )
 
     network.reset_state_variables()  # Reset state variables.
-    pbar.set_description_str("Test progress: ")
-    pbar.update()
+    # pbar.set_description_str("Test progress: ")
+    # pbar.update()
 
 print("\nAll activity accuracy: %.2f" % (accuracy["all"] / n_test))
 print("Proportion weighting accuracy: %.2f \n" % (accuracy["proportion"] / n_test))

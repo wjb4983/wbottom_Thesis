@@ -30,7 +30,7 @@ parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
-parser.add_argument("--n_train", type=int, default=0)
+parser.add_argument("--n_train", type=int, default=1000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -107,7 +107,7 @@ network = DiehlAndCook2015(
 
 if os.path.isfile("diehlcook.pth"):
     print("=======================================\nUsing diehlcook.pth found on your computer\n============================")
-    network.load_state_dict(torch.load('diehlcook.pth'))
+    # network.load_state_dict(torch.load('diehlcook.pth'))
 else:
     print("=======================================\nCreating new model - saved as diehlcook.pth\n============================")
     #note model created above
@@ -287,7 +287,10 @@ for epoch in range(n_epochs):
             # plt.pause(1e-8)
 
         network.reset_state_variables()  # Reset state variables.
-
+        non_negative_indices = torch.nonzero(assignments != -1).squeeze()
+        # Print the indices and corresponding values
+        for index in non_negative_indices:
+            print(f"Index: {index}, Assignment: {assignments[index]}")
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")
 

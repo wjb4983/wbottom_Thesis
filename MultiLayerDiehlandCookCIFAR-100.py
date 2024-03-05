@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar  4 13:26:03 2024
+
+@author: wbott
+"""
+
 import argparse
 import os
 from time import time as t
@@ -17,7 +24,7 @@ from bindsnet.analysis.plotting import (
     plot_voltages,
     plot_weights,
 )
-from bindsnet.datasets import MNIST
+from bindsnet.datasets import CIFAR100
 from bindsnet.encoding import PoissonEncoder
 from bindsnet.evaluation import all_activity, assign_labels, proportion_weighting
 from bindsnet.models import DiehlAndCook2015
@@ -164,7 +171,7 @@ parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.add_argument("--new_model", type=int, default="0") #1 if you want new model, 0 if use pretrained model
-parser.add_argument("--num_layers", type=int, default=2)
+parser.add_argument("--num_layers", type=int, default=5)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -216,34 +223,33 @@ start_intensity = intensity
 
 # Build network.
 network = MultiLayerDiehlAndCook2015(
-    n_inpt=784,
+    n_inpt=32 * 32 * 3,
     n_neurons=n_neurons,
     num_layers=num_layers,
     exc=exc,
     inh=inh,
     dt=dt,
-    norm=78.4,
+    norm=307.2,#78.4,
     theta_plus=theta_plus,
-    inpt_shape=(1, 28, 28),
+    inpt_shape=(3, 32, 32),
 )
 
-if os.path.isfile("Multidiehlcook.pth"):
-    print("=======================================\nUsing Multidiehlcook.pth found on your computer\n============================")
-    network.load_state_dict(torch.load('Multidiehlcook.pth'))
+if os.path.isfile("MultidiehlcookCIFAR-100.pth"):
+    print("=======================================\nUsing MultidiehlcookCIFAR-100.pth found on your computer\n============================")
+    network.load_state_dict(torch.load('MultidiehlcookCIFAR-100.pth'))
 else:
-    print("=======================================\nCreating new model - saved as Multidiehlcook.pth\n============================")
+    print("=======================================\nCreating new model - saved as MultidiehlcookCIFAR-100.pth\n============================")
     #note model created above
 # Directs network to GPU
 if gpu:
     network.to("cuda")
 
-# Load MNIST data.
-train_dataset = MNIST(
+train_dataset = CIFAR100(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..","..", "data", "MNIST"),
-    download=True,
+    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
     train=True,
+    download=True,
     transform=transforms.Compose(
         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     ),
@@ -253,7 +259,7 @@ train_dataset = MNIST(
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
 
 # Neuron assignments and spike proportions.
-n_classes = 10
+n_classes = 100
 assignments = -torch.ones(n_neurons, device=device)
 proportions = torch.zeros((n_neurons, n_classes), device=device)
 rates = torch.zeros((n_neurons, n_classes), device=device)
@@ -312,7 +318,7 @@ for epoch in range(n_epochs):
         if step > n_train:
             break
         # Get next input sample.
-        inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
+        inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 3, 32, 32)}
         if gpu:
             inputs = {k: v.cuda() for k, v in inputs.items()}
 
@@ -342,7 +348,7 @@ for epoch in range(n_epochs):
                 * torch.sum(label_tensor.long() == proportion_pred).item()
                 / len(label_tensor)
             )
-
+            print(label_tensor)
             print(
                 "\nAll activity accuracy: %.2f (last), %.2f (average), %.2f (best)"
                 % (
@@ -373,6 +379,7 @@ for epoch in range(n_epochs):
 
         labels.append(batch["label"])
 
+
         # Run the network on the input.
         network.run(inputs=inputs, time=time)
 
@@ -385,13 +392,14 @@ for epoch in range(n_epochs):
 
         # Optionally plot various simulation information.
         if plot:
-            image = batch["image"].view(28, 28)
-            inpt = inputs["X"].view(time, 784).sum(0).view(28, 28)
-            # input_exc_weights = network.connections[("X", "Ae")].w
+            image = batch["image"].view(3,32,32).permute(1, 2, 0)
+            image = image / image.max()
+            inpt = inputs["X"].view(time, 3072).sum(0).view(32,32,3)
+            # input_exc_weights = network.connections[("X", "Ae_0")].w
             # square_weights = get_square_weights(
-            #     input_exc_weights.view(784, n_neurons), n_sqrt, 28
+            #     input_exc_weights.view(3072, n_neurons), n_sqrt, 32
             # )
-            square_assignments = get_square_assignments(assignments, n_sqrt)
+            square_assignments = get_square_assignments(assignments, 100)
             spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
             # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
             inpt_axes, inpt_ims = plot_input(
@@ -408,21 +416,18 @@ for epoch in range(n_epochs):
             # plt.pause(1e-8)
 
         network.reset_state_variables()  # Reset state variables.
-        non_negative_indices = torch.nonzero(assignments != -1).squeeze()
-        # Print the indices and corresponding values
-        for index in non_negative_indices:
-            print(f"Index: {index}, Assignment: {assignments[index]}")
+        # Find indices where assignments doesn't equal -1
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")
 
-# Load MNIST data.
-test_dataset = MNIST(
+# Load CIFAR-100 test data
+test_dataset = CIFAR100(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..","..", "data", "MNIST"),
-    download=True,
+    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
     train=False,
+    download=True,
     transform=transforms.Compose(
         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     ),
@@ -444,7 +449,7 @@ for step, batch in enumerate(test_dataset):
     if step >= n_test:
         break
     # Get next input sample.
-    inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
+    inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 3, 32, 32).to(device)}
     if gpu:
         inputs = {k: v.cuda() for k, v in inputs.items()}
 
@@ -452,7 +457,7 @@ for step, batch in enumerate(test_dataset):
     network.run(inputs=inputs, time=time)
 
     # Add to spikes recording.
-    spike_record[0] = spikes["Ae"].get("s").squeeze()
+    # spike_record[0] = spikes["Ae"].get("s").squeeze()
 
     # Convert the array of labels into a tensor
     label_tensor = torch.tensor(batch["label"], device=device)

@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Mar  6 12:27:14 2024
+
+@author: wbott
+"""
+
 import argparse
 import os
 from time import time as t
@@ -16,7 +23,7 @@ from bindsnet.analysis.plotting import (
     plot_voltages,
     plot_weights,
 )
-from bindsnet.datasets import CIFAR100
+from bindsnet.datasets import CIFAR10
 from bindsnet.encoding import PoissonEncoder
 from bindsnet.evaluation import all_activity, assign_labels, proportion_weighting
 from bindsnet.network.monitors import Monitor
@@ -220,20 +227,20 @@ network = MultiLayerDiehlAndCook2015(
     inpt_shape=(3, 32, 32),
 )
 
-if os.path.isfile("MultidiehlcookCIFAR-100.pth")  and new_model == 1:
-    print("=======================================\nUsing MultidiehlcookCIFAR-100.pth found on your computer\n============================")
-    # network.load_state_dict(torch.load('MultidiehlcookCIFAR-100.pth'))
+if os.path.isfile("MultidiehlcookCIFAR-10.pth")  and new_model == 1:
+    print("=======================================\nUsing MultidiehlcookCIFAR-10.pth found on your computer\n============================")
+    # network.load_state_dict(torch.load('MultidiehlcookCIFAR-10.pth'))
 else:
-    print("=======================================\nCreating new model - saved as MultidiehlcookCIFAR-100.pth\n============================")
+    print("=======================================\nCreating new model - saved as MultidiehlcookCIFAR-10.pth\n============================")
     # note model created above
 # Directs network to GPU
 if gpu:
     network.to("cuda")
 
-train_dataset = CIFAR100(
+train_dataset = CIFAR10(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
+    root=os.path.join("..", "..", "..", "data", "CIFAR10"),
     train=True,
     download=True,
     transform=transforms.Compose(
@@ -246,7 +253,7 @@ spike_record = torch.zeros(
     (update_interval, int(time / dt), n_neurons), device=device)
 
 # Neuron assignments and spike proportions.
-n_classes = 100
+n_classes = 10
 assignments = -torch.ones(n_neurons, device=device)
 proportions = torch.zeros((n_neurons, n_classes), device=device)
 rates = torch.zeros((n_neurons, n_classes), device=device)
@@ -420,11 +427,11 @@ for epoch in range(n_epochs):
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")
 
-# Load CIFAR-100 test data
-test_dataset = CIFAR100(
+# Load CIFAR-10 test data
+test_dataset = CIFAR10(
     PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
+    root=os.path.join("..", "..", "..", "data", "CIFAR10"),
     train=False,
     download=True,
     transform=transforms.Compose(
@@ -492,4 +499,4 @@ print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
 
 # Save the trained network weights
-torch.save(network.state_dict(), 'MultidiehlcookCIFAR-100.pth')
+torch.save(network.state_dict(), 'MultidiehlcookCIFAR-10.pth')

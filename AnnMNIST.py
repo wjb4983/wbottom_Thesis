@@ -52,9 +52,8 @@ plt.imshow(np.transpose(grid, axes=(1,2,0)), cmap='gray');
 
 # Simple CNN
 class CNN(nn.Module):
-    def __init__(self, in_channels=1, num_classes=10):
+    def __init__(self, in_channels=1, num_classes=10, p_dropout=0.5):
         super(CNN, self).__init__()
-        #(1pt)TODO: Fill the missing with correct number
         self.conv1 = nn.Conv2d(
             in_channels=in_channels,
             out_channels=8, # hint: in_channels of next conv layer
@@ -64,7 +63,6 @@ class CNN(nn.Module):
         )
 
         # Reference: https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html
-        #(1pt)TODO: Use a Max Pooling layer with kernel size = 2 and stride =2
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.conv2 = nn.Conv2d(
@@ -74,17 +72,23 @@ class CNN(nn.Module):
             stride=(1, 1),
             padding=(1, 1),
         )
-        #(1pt)TODO: Fill the missing with correct number
-        self.fc1 = nn.Linear(16 * 7 * 7, num_classes) # hint: feature channels * length * width
+
+        # Number of neurons in fully-connected layer has been changed to 100
+        self.fc1 = nn.Linear(16 * 7 * 7, 100) # hint: feature channels * length * width
+        self.fc2 = nn.Linear(100, num_classes)
+        self.dropout = nn.Dropout(p=p_dropout)
 
     def forward(self, x):
-        x = self.conv1(x)                   #(1pt)TODO: Use conv1 layer defined above
-        x = F.relu(x)                       #(1pt)TODO: Use relu layer
-        x = self.pool(x)                    #(1pt)TODO: Use pooling layer defined above
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.pool(x)
         x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = x.reshape(x.shape[0], -1)
-        x = self.fc1(x)                     #(1pt)TODO: Use fully connection layer defined above
+        # New
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
         return x
 
 # Set device
@@ -96,13 +100,13 @@ batch_size = 64
 num_epochs = 10 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
 
 # Load pretrain model & you may modify it
-model = CNN(in_channels=1, num_classes=10)
+model = CNN(in_channels=1, num_classes=10, p_dropout=0.9)
 model.classifier = nn.Sequential(nn.Linear(512, 100), nn.ReLU(), nn.Linear(100, 10))
 model.to(device)
 
 # Loss and optimizer
 # Reference: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
-criterion = nn.CrossEntropyLoss() # (1pt)TODO: Use CrossEntropy as loss criterion
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 # Train Network
@@ -111,20 +115,16 @@ for epoch in range(num_epochs):
 
     # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
     for batch_idx, (data, targets) in enumerate(tqdm(train_loader)):
-        # (1pt) TODO: Get data to cuda if possible
         data = data.to(device)
         targets = targets.to(device)
 
-        # (1pt) TODO: forward
         outputs = model(data)
         loss = criterion(outputs, targets)
 
         losses.append(loss.item())
-        # (1pt) TODO: backward
         optimizer.zero_grad()
         loss.backward()
 
-        # (1pt) TODO: gradient descent or adam step
         optimizer.step()
 
     print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")

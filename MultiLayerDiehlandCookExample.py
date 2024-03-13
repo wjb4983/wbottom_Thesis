@@ -61,7 +61,7 @@ class MultiLayerDiehlAndCook2015(Network):
         self.exc = exc
         self.inh = inh
         self.dt = dt
-
+        
         # Layers and connections lists
         self.input_layers = []
         self.exc_layers = []
@@ -69,14 +69,19 @@ class MultiLayerDiehlAndCook2015(Network):
         self.input_exc_connections = []
         self.exc_inh_connections = []
         self.inh_exc_connections = []
-
+        layer_names = []
+        
+        # Create input layer
+        input_layer = Input(
+            n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
+        )
+        self.input_layers.append(input_layer)
+        layer_names.append("X")
+        self.add_layer(input_layer, name="X")
+        
+        
         for i in range(self.num_layers):
-            # Create input layer
-            input_layer = Input(
-                n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
-            )
-            self.input_layers.append(input_layer)
-
+            print(i)
             # Create excitatory layer
             exc_layer = DiehlAndCookNodes(
                 n=self.n_neurons,
@@ -91,7 +96,8 @@ class MultiLayerDiehlAndCook2015(Network):
                 tc_theta_decay=tc_theta_decay,
             )
             self.exc_layers.append(exc_layer)
-
+            layer_names.append(f"Ae_{i}")
+        
             # Create inhibitory layer
             inh_layer = LIFNodes(
                 n=self.n_neurons,
@@ -104,11 +110,23 @@ class MultiLayerDiehlAndCook2015(Network):
                 tc_trace=20.0,
             )
             self.inh_layers.append(inh_layer)
-
+            layer_names.append(f"Ai_{i}")
+            
+            
+            self.add_layer(exc_layer, name=f"Ae_{i}")
+            self.add_layer(inh_layer, name=f"Ai_{i}")
+        
             # Create connections
-            w_input_exc = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
+            # Create connections
+            if i == 0:  # If it's the first layer
+                w_input_exc = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
+                source_layer = "X"  # Source is the input layer
+            else:
+                w_input_exc = 0.3 * torch.rand(self.n_neurons, self.n_neurons)
+                source_layer = f"Ae_{i-1}"  # Source is the previous excitatory layer
+            
             input_exc_conn = Connection(
-                source=input_layer,
+                source=self.layers[source_layer],  # Use the appropriate source layer
                 target=exc_layer,
                 w=w_input_exc,
                 update_rule=PostPre,
@@ -117,15 +135,15 @@ class MultiLayerDiehlAndCook2015(Network):
                 wmin=wmin,
                 wmax=wmax,
                 norm=norm,
-            )
+                )
             self.input_exc_connections.append(input_exc_conn)
-
+        
             w_exc_inh = self.exc * torch.diag(torch.ones(self.n_neurons))
             exc_inh_conn = Connection(
                 source=exc_layer, target=inh_layer, w=w_exc_inh, wmin=0, wmax=self.exc
             )
             self.exc_inh_connections.append(exc_inh_conn)
-
+        
             w_inh_exc = -self.inh * (
                 torch.ones(self.n_neurons, self.n_neurons)
                 - torch.diag(torch.ones(self.n_neurons))
@@ -134,14 +152,15 @@ class MultiLayerDiehlAndCook2015(Network):
                 source=inh_layer, target=exc_layer, w=w_inh_exc, wmin=-self.inh, wmax=0
             )
             self.inh_exc_connections.append(inh_exc_conn)
-
-            # Add layers and connections to the network
-            self.add_layer(input_layer, name=f"X_{i}")
-            self.add_layer(exc_layer, name=f"Ae_{i}")
-            self.add_layer(inh_layer, name=f"Ai_{i}")
-            self.add_connection(input_exc_conn, source=f"X_{i}", target=f"Ae_{i}")
+            if(i==0):
+                self.add_connection(input_exc_conn, source="X", target=f"Ae_{i}")
+            else:
+                self.add_connection(input_exc_conn, source=f"Ae_{i-1}", target=f"Ae_{i}")
             self.add_connection(exc_inh_conn, source=f"Ae_{i}", target=f"Ai_{i}")
             self.add_connection(inh_exc_conn, source=f"Ai_{i}", target=f"Ae_{i}")
+        
+            # Set the next input layer to the current excitatory layer
+            input_layer = exc_layer
 
 
 parser = argparse.ArgumentParser()
@@ -163,7 +182,7 @@ parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--new_model", type=int, default="0") #1 if you want new model, 0 if use pretrained model
+parser.add_argument("--new_model", type=int, default=0) #1 if you want new model, 0 if use pretrained model
 parser.add_argument("--num_layers", type=int, default=2)
 parser.set_defaults(plot=True, gpu=True)
 
@@ -293,6 +312,9 @@ assigns_im = None
 perf_ax = None
 voltage_axes, voltage_ims = None, None
 
+print(spikes.keys())
+print("Network layers:", network.layers)
+
 # Train the network.
 print("\nBegin training.\n")
 start = t()
@@ -381,7 +403,7 @@ for epoch in range(n_epochs):
         # inh_voltages = inh_voltage_monitor.get("v")
 
         # Add to spikes recording.
-        # spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
+        spike_record[step % update_interval] = spikes[f"Ae_{num_layers-1}"].get("s").squeeze()
 
         # Optionally plot various simulation information.
         if plot:

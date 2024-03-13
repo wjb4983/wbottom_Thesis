@@ -33,7 +33,7 @@ parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=300)
-parser.add_argument("--n_train", type=int, default=3000)
+parser.add_argument("--n_train", type=int, default=6000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -42,11 +42,12 @@ parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=28)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--update_interval", type=int, default=250)
+parser.add_argument("--update_interval", type=int, default=1000)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_false")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
+parser.add_argument("--new_model", type=int, default=0)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -68,6 +69,7 @@ update_interval = args.update_interval
 train = args.train
 plot = args.plot
 gpu = args.gpu
+new_model = args.new_model
 
 # Sets up GPU usage
 device = torch.device("cuda" if torch.cuda.is_available() and gpu else "cpu")
@@ -90,6 +92,11 @@ network = DiehlAndCook2015(
     theta_plus=theta_plus,
     inpt_shape=(3, 32, 32),  # Adjusted input shape for CIFAR-10 images
 )
+if os.path.isfile("diehlcookcifar10.pth")  and new_model == 0:
+    print("=======================================\nUsing diehlcookcifar10.pth found on your computer\n============================")
+    network.load_state_dict(torch.load('diehlcookcifar10.pth'))
+else:
+    print("=======================================\nCreating new model - saved as diehlcookcifar-100.pth\n============================")
 
 # Directs network to GPU
 network.to(device)
@@ -159,6 +166,9 @@ for epoch in range(n_epochs):
     labels = []
     if (rstep > n_train):
         break
+    
+
+    # note model created above
     # if epoch % progress_interval == 0:
         # print("Progress: %d / %d (%.4f seconds)" % (epoch, n_epochs, t() - start))
         # start = t()
@@ -327,8 +337,8 @@ for step, batch in enumerate(test_dataset):
     )
 
     # Compute network accuracy according to available classification strategies
-    accuracy["all"] += float(torch.sum(label_tensor.long() == all_activity_pred).item())
-    accuracy["proportion"] += float(
+    accuracy["all"] += 100 * float(torch.sum(label_tensor.long() == all_activity_pred).item())
+    accuracy["proportion"] += 100 * float(
         torch.sum(label_tensor.long() == proportion_pred).item()
     )
 
@@ -344,4 +354,4 @@ print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
 
 # Save the trained network weights
-torch.save(network.state_dict(), 'diehlcookcifar.pth')
+torch.save(network.state_dict(), 'diehlcookcifar10.pth')

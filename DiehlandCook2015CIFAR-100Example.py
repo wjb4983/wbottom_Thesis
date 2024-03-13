@@ -32,15 +32,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=300)
 parser.add_argument("--n_epochs", type=int, default=1)
-parser.add_argument("--n_test", type=int, default=10000)
-parser.add_argument("--n_train", type=int, default=60000)
+parser.add_argument("--n_test", type=int, default=100)
+parser.add_argument("--n_train", type=int, default=200)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
 parser.add_argument("--theta_plus", type=float, default=0.05)
 parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
-parser.add_argument("--intensity", type=float, default=128)
+parser.add_argument("--intensity", type=float, default=32)
 parser.add_argument("--progress_interval", type=int, default=10)
 parser.add_argument("--update_interval", type=int, default=250)
 parser.add_argument("--train", dest="train", action="store_true")
@@ -244,28 +244,30 @@ for epoch in range(n_epochs):
         spike_record[rstep % update_interval] = spikes["Ae"].get("s").squeeze()
 
         # Optionally plot various simulation information
-        # if plot:
+        if plot:
             # image = individual_image
-            # # inpt = inputs["X"].view(time, 32 * 32 * 3).sum(0).view(32, 32, 3)
-            # inpt = inputs["X"].view(time, 32 * 32 * 3).sum(0).view(3, 32, 32)
-            # input_exc_weights = network.connections[("X", "Ae")].w
-            # # print("Shape of input_exc_weights:", input_exc_weights.shape)
-            # # square_weights = get_square_weights(
-            # #     input_exc_weights, n_sqrt, 32*math.sqrt(3)
-            # # )
-            # # square_assignments = get_square_assignments(assignments, n_sqrt)
-            # spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            image = batch["image"].view(3,32,32).permute(1, 2, 0)
+            image = image / image.max()
+            inpt = inputs["X"].view(time, 3072).sum(0).view(32,32,3)
+            # input_exc_weights = network.connections[("X", "Ae_0")].w
+            # square_weights = get_square_weights(
+            #     input_exc_weights.view(3072, n_neurons), n_sqrt, 32
+            # )
+            square_assignments = get_square_assignments(assignments, 100)
+            spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
             # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
-            # # inpt_axes, inpt_ims = plot_input(
-            # #     image, inpt, label=batch[1].item(), axes=inpt_axes, ims=inpt_ims
-            # # )
-            # spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
-            # # weights_im = plot_weights(square_weights, im=weights_im)
-            # # assigns_im = plot_assignments(square_assignments, im=assigns_im)
-            # perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
+            inpt_axes, inpt_ims = plot_input(
+                image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
+            )
+            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
+            # weights_im = plot_weights(square_weights, im=weights_im)
+            assigns_im = plot_assignments(square_assignments, im=assigns_im)
+            perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
             # voltage_ims, voltage_axes = plot_voltages(
             #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
             # )
+
+            # plt.pause(1e-8)
 
         network.reset_state_variables()  # Reset state variables
         pbar.set_description_str("Train progress: ")

@@ -61,41 +61,30 @@ plt.imshow(np.transpose(grid, axes=(1,2,0)), cmap='gray');
 class CNN(nn.Module):
     def __init__(self, in_channels=3, num_classes=100, p_dropout=0.5):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=8, # hint: in_channels of next conv layer
-            kernel_size=(3, 3),
-            stride=(1, 1),
-            padding=(1, 1),
-        )
-
-        # Reference: https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html
+        self.conv1 = nn.Conv2d(in_channels, 8, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.conv2 = nn.Conv2d(
-            in_channels=8,
-            out_channels=16,
-            kernel_size=(3, 3),
-            stride=(1, 1),
-            padding=(1, 1),
-        )
-
-        # Number of neurons in fully-connected layer has been changed to 100
-        self.fc1 = nn.Linear(16 * 8 * 8, 100) # hint: feature channels * length * width
+        self.conv4 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv6 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.dropout1 = nn.Dropout(p=p_dropout)
+        # Adjust the size here based on the actual output from the last conv layer
+        self.fc1 = nn.Linear(256 * 8 * 8, 100)
+        self.dropout2 = nn.Dropout(p=p_dropout)
         self.fc2 = nn.Linear(100, num_classes)
-        self.dropout = nn.Dropout(p=p_dropout)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.pool(x)
+        x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.reshape(x.shape[0], -1)
-        # New
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
+        x = self.pool(F.relu(self.conv3(x)))
+        x = F.relu(self.conv4(x))
+        x = F.relu(self.conv5(x))
+        x = self.pool2(F.relu(self.conv6(x)))
+        x = x.view(x.size(0), -1)  # Flatten
+        x = self.dropout1(F.relu(self.fc1(x)))
+        x = self.fc2(self.dropout2(x))
         return x
 
 # Set device

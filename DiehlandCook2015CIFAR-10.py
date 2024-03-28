@@ -33,7 +33,7 @@ parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=1000)
-parser.add_argument("--n_train", type=int, default=20000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -47,7 +47,7 @@ parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_false")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--new_model", type=int, default=0)
+parser.add_argument("--new_model", type=int, default=1)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -96,7 +96,7 @@ if os.path.isfile("diehlcookcifar10.pth")  and new_model == 0:
     print("=======================================\nUsing diehlcookcifar10.pth found on your computer\n============================")
     network.load_state_dict(torch.load('diehlcookcifar10.pth'))
 else:
-    print("=======================================\nCreating new model - saved as diehlcookcifar-100.pth\n============================")
+    print("=======================================\nCreating new model - saved as diehlcookcifar-10.pth\n============================")
 
 # Directs network to GPU
 network.to(device)

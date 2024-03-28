@@ -81,20 +81,33 @@ class MultiLayerDiehlAndCook2015(Network):
         
         
         for i in range(self.num_layers):
-            print(i)
             # Create excitatory layer
-            exc_layer = DiehlAndCookNodes(
-                n=self.n_neurons,
-                traces=True,
-                rest=-65.0,
-                reset=-60.0,
-                thresh=exc_thresh,
-                refrac=5,
-                tc_decay=100.0,
-                tc_trace=20.0,
-                theta_plus=theta_plus,
-                tc_theta_decay=tc_theta_decay,
-            )
+            if(i<num_layers-1):
+                exc_layer = DiehlAndCookNodes(
+                    n=self.n_neurons,
+                    traces=True,
+                    rest=-65.0,
+                    reset=-60.0,
+                    thresh=exc_thresh*4,
+                    refrac=5,
+                    tc_decay=100.0,
+                    tc_trace=20.0,
+                    theta_plus=theta_plus,
+                    tc_theta_decay=tc_theta_decay,
+                )
+            else:
+                exc_layer = DiehlAndCookNodes(
+                    n=self.n_neurons,
+                    traces=True,
+                    rest=-65.0,
+                    reset=-60.0,
+                    thresh=exc_thresh,
+                    refrac=5,
+                    tc_decay=100.0,
+                    tc_trace=20.0,
+                    theta_plus=theta_plus,
+                    tc_theta_decay=tc_theta_decay,
+                )
             self.exc_layers.append(exc_layer)
             layer_names.append(f"Ae_{i}")
         
@@ -167,8 +180,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
-parser.add_argument("--n_test", type=int, default=100)
-parser.add_argument("--n_train", type=int, default=1000)
+parser.add_argument("--n_test", type=int, default=1000)
+parser.add_argument("--n_train", type=int, default=20000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -177,7 +190,7 @@ parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--update_interval", type=int, default=250)
+parser.add_argument("--update_interval", type=int, default=1000)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
@@ -432,8 +445,8 @@ for epoch in range(n_epochs):
         network.reset_state_variables()  # Reset state variables.
         non_negative_indices = torch.nonzero(assignments != -1).squeeze()
         # Print the indices and corresponding values
-        for index in non_negative_indices:
-            print(f"Index: {index}, Assignment: {assignments[index]}")
+        # for index in non_negative_indices:
+        #     print(f"Index: {index}, Assignment: {assignments[index]}")
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")
@@ -474,7 +487,7 @@ for step, batch in enumerate(test_dataset):
     network.run(inputs=inputs, time=time)
 
     # Add to spikes recording.
-    spike_record[0] = spikes["Ae"].get("s").squeeze()
+    spike_record[0] = spikes[f"Ae_{num_layers-1}"].get("s").squeeze()
 
     # Convert the array of labels into a tensor
     label_tensor = torch.tensor(batch["label"], device=device)

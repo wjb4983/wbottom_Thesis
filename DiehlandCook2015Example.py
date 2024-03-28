@@ -252,6 +252,7 @@ for epoch in range(n_epochs):
 
         labels.append(batch["label"])
 
+        print(f"Step: {step}, Input Shape: {inputs['X'].shape}")
         # Run the network on the input.
         network.run(inputs=inputs, time=time)
 

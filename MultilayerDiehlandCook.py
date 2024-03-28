@@ -60,7 +60,19 @@ class MultiLayerDiehlAndCook2015(Network):
         
         for i in range(self.num_layers):
             # Create excitatory layer
-            exc_layer = DiehlAndCookNodes(
+            # exc_layer = DiehlAndCookNodes(
+            #     n=self.n_neurons,
+            #     traces=True,
+            #     rest=-65.0,
+            #     reset=-60.0,
+            #     thresh=exc_thresh,
+            #     refrac=5,
+            #     tc_decay=100.0,
+            #     tc_trace=20.0,
+            #     theta_plus=theta_plus,
+            #     tc_theta_decay=tc_theta_decay,
+            # )
+            exc_layer = LIFNodes(
                 n=self.n_neurons,
                 traces=True,
                 rest=-65.0,

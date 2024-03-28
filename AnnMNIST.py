@@ -54,40 +54,44 @@ plt.imshow(np.transpose(grid, axes=(1,2,0)), cmap='gray');
 class CNN(nn.Module):
     def __init__(self, in_channels=1, num_classes=10, p_dropout=0.5):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=8, # hint: in_channels of next conv layer
-            kernel_size=(3, 3),
-            stride=(1, 1),
-            padding=(1, 1),
-        )
-
-        # Reference: https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html
+        # Convolutional layer 1
+        self.conv1 = nn.Conv2d(in_channels, 8, kernel_size=3, stride=1, padding=1)
+        # Convolutional layer 2
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
+        # Convolutional layer 3
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        # Max pooling layer
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.conv2 = nn.Conv2d(
-            in_channels=8,
-            out_channels=16,
-            kernel_size=(3, 3),
-            stride=(1, 1),
-            padding=(1, 1),
-        )
-
-        # Number of neurons in fully-connected layer has been changed to 100
-        self.fc1 = nn.Linear(16 * 7 * 7, 100) # hint: feature channels * length * width
+        # Convolutional layer 4
+        self.conv4 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        # Convolutional layer 5
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        # Pooling layer to reduce the dimensions
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        # Convolutional layer 6
+        self.conv6 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        # Dropout layer for regularization
+        self.dropout1 = nn.Dropout(p=p_dropout)
+        # Fully connected layer 1
+        self.fc1 = nn.Linear(256 * 7 * 7, 100)
+        # Dropout layer before the final layer
+        self.dropout2 = nn.Dropout(p=p_dropout)
+        # Fully connected layer 2 (Output layer)
         self.fc2 = nn.Linear(100, num_classes)
-        self.dropout = nn.Dropout(p=p_dropout)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = self.pool(x)
-        x = F.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.reshape(x.shape[0], -1)
-        # New
+        # Applying convolutions and activation functions
+        x = F.relu(self.conv1(x))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = self.pool2(F.relu(self.conv5(x)))
+        x = F.relu(self.conv6(x))
+        x = self.dropout1(x)
+        # Flattening the output for the fully connected layer
+        x = x.view(-1, 256 * 7 * 7)
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
+        x = self.dropout2(x)
         x = self.fc2(x)
         return x
 

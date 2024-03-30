@@ -83,25 +83,26 @@ n_sqrt = int(np.ceil(np.sqrt(n_neurons)))
 import torch.nn as nn
 
 class VGGSmallFeatureExtractor(nn.Module):
-    def __init__(self, num_classes=100):
+    def __init__(self, num_classes=10):
         super(VGGSmallFeatureExtractor, self).__init__()
-        self.features = self._make_layers(cfg=[64, 64, 'M', 128, 128, 'M'])#, 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'])
+        self.features = self._make_layers([64, 64, 'M', 128, 128, 'M'])
         self.classifier = nn.Sequential(
-             nn.Linear(128 * 8 * 8, 4096),
-             nn.ReLU(True),
-             nn.Dropout(),
-             nn.Linear(4096, 4096),
-             nn.ReLU(True),
-             nn.Dropout(),
-             nn.Linear(4096, num_classes),
-         )
+            nn.Linear(128 * 7 * 7, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes),
+        )
 
     def forward(self, x):
         x = self.features(x)
         return x
+
     def _make_layers(self, cfg):
         layers = []
-        in_channels = 3
+        in_channels = 1  # Change input channels to 1
         for v in cfg:
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -112,21 +113,21 @@ class VGGSmallFeatureExtractor(nn.Module):
         return nn.Sequential(*layers)
 
 VGGSmallFE = VGGSmallFeatureExtractor()
-VGGSmallFE.load_state_dict(torch.load('VGGSmallMNIST', map_location=torch.device(device)))
+VGGSmallFE.load_state_dict(torch.load('VGGSmallMNIST.pth', map_location=torch.device(device)))
 
 ###POISON ENCODER FOR VGGSMALL OUTPUT
 encoder = PoissonEncoder(time=time, dt=dt, intensity=intensity)
 
 # Build network
 network = DiehlAndCook2015(
-    n_inpt=128 *8 *8,  # Adjusted input size for feature extraction in VGGSmall
+    n_inpt=128 *7 *7,  # Adjusted input size for feature extraction in VGGSmall
     n_neurons=n_neurons,
     exc=exc,
     inh=inh,
     dt=dt,
-    norm=(128*8*8)/10000,#78.4,
+    norm=(128*7*7)/10,#78.4,
     theta_plus=theta_plus,
-    inpt_shape=(128,8,8),  # Adjusted input shape for CIFAR-100 images
+    inpt_shape=(128,7,7),  # Adjusted input shape for CIFAR-100 images
 )
 if os.path.isfile("VGGSmall-SNNAugment.pth"):
     print("=======================================\nUsing VGGSmall-SNNAugment(network).pth found on your computer\n============================")
@@ -215,7 +216,7 @@ for epoch in range(n_epochs):
             break
         CNN_out = VGGSmallFE(batch["encoded_image"])
         spike_train = encoder(CNN_out)
-        inputs = {"X": spike_train.view(int(time / dt), 1, 128,8,8).to(device)}
+        inputs = {"X": spike_train.view(int(time / dt), 1, 128,7,7).to(device)}
         # if gpu:
         #     inputs = {k: v.cuda() for k, v in inputs.items()}
 

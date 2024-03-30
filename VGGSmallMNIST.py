@@ -25,7 +25,7 @@ class VGGSmall(nn.Module):
         super(VGGSmall, self).__init__()
         self.features = self._make_layers([64, 64, 'M', 128, 128, 'M'])
         self.classifier = nn.Sequential(
-            nn.Linear(128 * 8 * 8, 4096),
+            nn.Linear(128 * 7 * 7, 4096),
             nn.ReLU(True),
             nn.Dropout(),
             nn.Linear(4096, 4096),

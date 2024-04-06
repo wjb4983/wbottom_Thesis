@@ -24,9 +24,10 @@ from bindsnet.models import DiehlAndCook2015
 from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
 from bindsnet.network import Network
-
+# from experiments.utils import update_curves, print_results
+# 
 parser = argparse.ArgumentParser()
-parser.add_argument("--seed", type=int, default=0)
+parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=100)
@@ -87,8 +88,8 @@ print("Running on Device = ", device)
 if n_workers == -1:
     n_workers = 0  # gpu * 4 * torch.cuda.device_count()
 
-if not train:
-    update_interval = n_test
+# if not train:
+    # update_interval = n_test
 
 n_sqrt = int(np.ceil(np.sqrt(n_neurons)))
 start_intensity = intensity
@@ -129,7 +130,7 @@ train_dataset = MNIST(
 
 # Record spikes during the simulation.
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
-
+print(update_interval)
 # Neuron assignments and spike proportions.
 n_classes = 10
 assignments = -torch.ones(n_neurons, device=device)
@@ -252,7 +253,7 @@ for epoch in range(n_epochs):
 
         labels.append(batch["label"])
 
-        print(f"Step: {step}, Input Shape: {inputs['X'].shape}")
+        # print(f"Step: {step}, Input Shape: {inputs['X'].shape}")
         # Run the network on the input.
         network.run(inputs=inputs, time=time)
 
@@ -262,6 +263,19 @@ for epoch in range(n_epochs):
 
         # Add to spikes recording.
         spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
+        # print(spike_record.shape)
+        # # s_permuted = spike_record.permute((2, 1, 0))
+        # # print(s_permuted.shape)
+        #         # Create a plot
+        # s_permuted = spike_record[step]
+        # plt.figure(figsize=(10, 6))
+        
+        # # Iterate over the dimensions to plot the spikes
+        # for x in range(s_permuted.shape[0]):
+        #     for y in range(s_permuted.shape[1]):
+        #         # Check if there are spikes at this location
+        #         if s_permuted[x, y].sum() > 0:
+        #             plt.scatter(x, y, color='black', marker='o')
 
         # Optionally plot various simulation information.
         if plot:

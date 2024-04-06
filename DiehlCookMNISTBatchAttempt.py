@@ -27,7 +27,7 @@ from bindsnet.network import Network
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=1)
-parser.add_argument("--n_neurons", type=int, default=400)
+parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=10)
 parser.add_argument("--n_test", type=int, default=10000)
 parser.add_argument("--n_train", type=int, default=50000)
@@ -39,12 +39,12 @@ parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--update_interval", type=int, default=400)
+parser.add_argument("--update_interval", type=int, default=500)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=50)
 parser.add_argument("--new_model", type=int, default="0") #1 if you want new model, 0 if use pretrained model
 parser.set_defaults(plot=True, gpu=True)
 
@@ -128,6 +128,20 @@ train_dataset = MNIST(
         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
     ),
 )
+#########################################################
+# Sort Data in case the program learns better when getting the same data
+sorted_train_dataset = []
+# for item in train_dataset:
+#     # print(item.shape)
+#     print(item.keys())
+
+# for data_label_tuple in train_dataset:
+#     # Unpack the data and label from the tuple
+#     data, label = data_label_tuple
+#     sorted_train_dataset.append((data, label))
+
+train_dataset = sorted(train_dataset, key=lambda x: x["label"])
+print("s")
 
 # Record spikes during the simulation.
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
@@ -186,7 +200,8 @@ for epoch in range(n_epochs):
 
     # Create a dataloader to iterate and batch data
     dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=n_workers, pin_memory=gpu
+        sorted_dataset, batch_size=batch_size, shuffle=False, num_workers=n_workers, pin_memory=gpu
+        # train_dataset, batch_size=batch_size, shuffle=True, num_workers=n_workers, pin_memory=gpu
     )
 
     for step, batch in enumerate(tqdm(dataloader)):
@@ -255,6 +270,7 @@ for epoch in range(n_epochs):
 
         # labels.append(batch["label"])
         labels.extend(batch["label"].tolist())
+        print(labels)
         # print(f"Step: {step}, Input Shape: {inpts['X'].shape}")
 
         # Run the network on the input.
@@ -264,7 +280,11 @@ for epoch in range(n_epochs):
         exc_voltages = exc_voltage_monitor.get("v")
         inh_voltages = inh_voltage_monitor.get("v")
         s = spikes["Ae"].get("s").permute((1, 0, 2))
-
+        print(s.shape)
+        print(spike_record.shape)
+        s_in = spikes["X"].get("s")#.permute((1, 0, 2))
+        s_in = s_in.squeeze().reshape(250, 28, 28)
+        s_in = s_in.view(250, -1)
         # Add to spikes recording.
         # spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
         # spike_record[
@@ -275,47 +295,59 @@ for epoch in range(n_epochs):
         spike_record[
             (step * batch_size) % update_interval: (step * batch_size) % update_interval + s.size(0)
             ] = s
-
-        # if plot:
-        #         _spikes = {
-        #             'X': spikes['X'].get('s').view(batch_size, time,1,28,28)[0],
-        #             'Y': spikes['Y'].get('s').view(batch_size, time)[0]
-        #         }
-    
-                # spike_ims, spike_axes = plot_spikes(spikes=_spikes, ims=spike_ims, axes=spike_axes)
-                # weights_im = plot_locally_connected_weights(
-                #     network.connections['X', 'Y'].w, im=weights_im
-                # )
+                
+        # s_permuted = s_in.permute((2, 1, 0))
+                # Create a plot
+        plt.figure(figsize=(10, 6))
+        
+        # Iterate over the dimensions to plot the spikes
+        for x in range(s_in.shape[0]):
+            for y in range(s_in.shape[1]):
+                # Check if there are spikes at this location
+                if s_in[x, y].sum() > 0:
+                    plt.scatter(x, y, color='black', marker='o')
+        
+        # Set labels and title
+        plt.xlabel('Time Step')
+        plt.ylabel('Neuron Index')
+        plt.title('Spikes Plot')
         # Optionally plot various simulation information.
-        # if plot:
-        #     image = batch["image"]
-        #     image = image[0].view(28, 28)
-        #     # inpt = inpts["X"]
-        #     # # inpt = inpt[0].view(time, 784).sum(0).view(28, 28)
-        #     # inpt = inpt["X"].view(time, -1)
-        #     # inpt = inpt.view(-1, 28, 28)
-        #     # inpt = inpt["X"].view(time, -1)  # Reshape to (time, 784)
-        #     inpt = inpts["X"]
-        #     inpt = inpt.view(-1, 28, 28)
-        #     inpt = inpt[0].view(time, 784).sum(0).view(28, 28)
-        #     inpt = inpt.view(-1, 28, 28)
-        #     input_exc_weights = network.connections[("X", "Ae")].w
-        #     square_weights = get_square_weights(
-        #         input_exc_weights.view(784, n_neurons), n_sqrt, 28
-        #     )
-        #     square_assignments = get_square_assignments(assignments, n_sqrt)
-        #     spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
-        #     voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
-        #     inpt_axes, inpt_ims = plot_input(
-        #         image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
-        #     )
-        #     spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
-        #     weights_im = plot_weights(square_weights, im=weights_im)
-        #     assigns_im = plot_assignments(square_assignments, im=assigns_im)
-        #     perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
-        #     voltage_ims, voltage_axes = plot_voltages(
-        #         voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-        #     )
+        if plot:
+            image = batch["image"][0].view(1,28,28).permute(1, 2, 0)
+            image = image / image.max()
+            inpt = inpts["X"][0][0].view(1,28,28)
+            inpt = inpt.squeeze() 
+            local_inpy = inpt.reshape(inpt.shape[0], -1)
+            spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            
+            # curves, preds = update_curves(
+            #         curves, label_tensor, n_classes, spike_record=spike_record, assignments=assignments,
+            #         proportions=proportions, ngram_scores=ngram_scores, n=2
+            #     )
+            # input_exc_weights = network.connections[("X", "Ae")].w
+            # square_weights = get_square_weights(
+            #     input_exc_weights.view(784, n_neurons), n_sqrt, 28
+            # )
+            # square_assignments = get_square_assignments(assignments, n_sqrt)
+
+            for key, value in spikes.items():
+                # Assuming 'value' is a torch.Tensor representing spikes
+                spikes_[key] = value.get("s")[:batch_size, 0]  # Extracting spikes for the first image
+            voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
+            
+            # print(type(spike_record))
+            # spikes_ = spike_record[(step * batch_size) % update_interval]["Ae"].get("s")
+            
+            inpt_axes, inpt_ims = plot_input(
+                image, local_inpy, label=batch["label"][0], axes=inpt_axes, ims=inpt_ims
+            )
+            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
+            # weights_im = plot_weights(square_weights, im=weights_im)
+            # assigns_im = plot_assignments(square_assignments, im=assigns_im)
+            perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
+            voltage_ims, voltage_axes = plot_voltages(
+                voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+            )
 
             # plt.pause(1e-8)
 

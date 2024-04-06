@@ -7,8 +7,8 @@ import numpy as np
 import torch
 from torchvision import transforms
 from tqdm.auto import tqdm
-from bindsnet.datasets import CIFAR100
-from VGGSmallCifar100 import VGGSmall
+from bindsnet.datasets import MNIST
+from VGGSmallMNIST import VGGSmall
 
 from bindsnet.analysis.plotting import (
     plot_assignments,
@@ -30,7 +30,7 @@ class TorchvisionDatasetWrapper:
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--seed", type=int, default=1)
+parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
@@ -41,13 +41,14 @@ parser.add_argument("--inh", type=float, default=120)
 parser.add_argument("--theta_plus", type=float, default=0.05)
 parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
-parser.add_argument("--intensity", type=float, default=128)
+parser.add_argument("--intensity", type=float, default=128*20)
 parser.add_argument("--progress_interval", type=int, default=10)
 parser.add_argument("--update_interval", type=int, default=1000)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", default=False)
 parser.add_argument("--gpu", dest="gpu", action="store_true")
+parser.add_argument("--batch_size", type=int, default=50)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -69,6 +70,7 @@ update_interval = args.update_interval
 train = args.train
 plot = args.plot
 gpu = args.gpu
+batch_size = args.batch_size
 
 # Sets up GPU usage
 device = torch.device("cuda" if torch.cuda.is_available() and gpu else "cpu")
@@ -83,25 +85,26 @@ n_sqrt = int(np.ceil(np.sqrt(n_neurons)))
 import torch.nn as nn
 
 class VGGSmallFeatureExtractor(nn.Module):
-    def __init__(self, num_classes=100):
+    def __init__(self, num_classes=10):
         super(VGGSmallFeatureExtractor, self).__init__()
-        self.features = self._make_layers(cfg=[64, 64, 'M', 128, 128, 'M'])#, 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'])
+        self.features = self._make_layers([64, 64, 'M', 128, 128, 'M'])
         self.classifier = nn.Sequential(
-             nn.Linear(128 * 8 * 8, 4096),
-             nn.ReLU(True),
-             nn.Dropout(),
-             nn.Linear(4096, 4096),
-             nn.ReLU(True),
-             nn.Dropout(),
-             nn.Linear(4096, num_classes),
-         )
+            nn.Linear(128 * 7 * 7, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes),
+        )
 
     def forward(self, x):
         x = self.features(x)
         return x
+
     def _make_layers(self, cfg):
         layers = []
-        in_channels = 3
+        in_channels = 1  # Change input channels to 1
         for v in cfg:
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -112,21 +115,21 @@ class VGGSmallFeatureExtractor(nn.Module):
         return nn.Sequential(*layers)
 
 VGGSmallFE = VGGSmallFeatureExtractor()
-VGGSmallFE.load_state_dict(torch.load('VGGSmallCifar100.pth', map_location=torch.device(device)))
+VGGSmallFE.load_state_dict(torch.load('VGGSmallMNIST.pth', map_location=torch.device(device)))
 
 ###POISON ENCODER FOR VGGSMALL OUTPUT
 encoder = PoissonEncoder(time=time, dt=dt, intensity=intensity)
 
 # Build network
 network = DiehlAndCook2015(
-    n_inpt=128 *8 *8,  # Adjusted input size for feature extraction in VGGSmall
+    n_inpt=128 *7 *7,  # Adjusted input size for feature extraction in VGGSmall
     n_neurons=n_neurons,
     exc=exc,
     inh=inh,
     dt=dt,
-    norm=(128*8*8)/10000,#78.4,
+    norm=(128*7*7)/10,#78.4,
     theta_plus=theta_plus,
-    inpt_shape=(128,8,8),  # Adjusted input shape for CIFAR-100 images
+    inpt_shape=(128,7,7),  # Adjusted input shape for CIFAR-100 images
 )
 if os.path.isfile("VGGSmall-SNNAugment.pth"):
     print("=======================================\nUsing VGGSmall-SNNAugment(network).pth found on your computer\n============================")
@@ -138,10 +141,10 @@ else:
 network.to(device)
 
 
-train_dataset = CIFAR100(
+train_dataset = MNIST(
     # PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
+    root=os.path.join("..", "..", "..", "data", "MNIST"),
     train=True,
     download=True,
     transform=transforms.Compose(
@@ -153,7 +156,7 @@ train_dataset = CIFAR100(
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
 
 # Neuron assignments and spike proportions
-n_classes = 100  # CIFAR-100 has 100 classes
+n_classes = 10  # MNIST
 assignments = -torch.ones(n_neurons, device=device)
 proportions = torch.zeros((n_neurons, n_classes), device=device)
 rates = torch.zeros((n_neurons, n_classes), device=device)
@@ -208,20 +211,20 @@ for epoch in range(n_epochs):
 
     # Create a DataLoader to iterate and batch data
     dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=0, pin_memory=gpu#n_workers, pin_memory=gpu
+        train_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=gpu#n_workers, pin_memory=gpu
     )
     for step, batch in enumerate(dataloader):#tqdm(dataloader)):
-        if (rstep > n_train):
+        if (step+1) * batch_size > n_train:
             break
         CNN_out = VGGSmallFE(batch["encoded_image"])
         spike_train = encoder(CNN_out)
-        inputs = {"X": spike_train.view(int(time / dt), 1, 128,8,8).to(device)}
+        inputs = {"X": spike_train.view(int(time / dt), batch_size, 128,7,7).to(device)}
         # if gpu:
         #     inputs = {k: v.cuda() for k, v in inputs.items()}
 
 
-        if rstep % update_interval == 0 and rstep > 0:
-            # torch.save(network.state_dict(), 'diehlcookcifar.pth')
+        if (step) * batch_size % update_interval == 0 and rstep > 0:
+            # torch.save(network.state_dict(), 'diehlcookMNIST.pth')
             # Convert the array of labels into a tensor
             label_tensor = torch.tensor(labels, device=device)
 
@@ -276,23 +279,30 @@ for epoch in range(n_epochs):
 
             labels = []
 
-        labels.append(batch["label"])
-        # Run the network on the input
+        # labels.append(batch["label"])
+        labels.extend(batch["label"].tolist())
+        # print(f"Step: {step}, Input Shape: {inpts['X'].shape}")
+
+        # Run the network on the input.
         network.run(inputs=inputs, time=time)
 
-        # Get voltage recording
+        # Get voltage recording.
         exc_voltages = exc_voltage_monitor.get("v")
         inh_voltages = inh_voltage_monitor.get("v")
+        s = spikes["Ae"].get("s").permute((1, 0, 2))
 
-        # Add to spikes recording
-        spike_record[rstep % update_interval] = spikes["Ae"].get("s").squeeze()
+
+        spike_record[
+            (step * batch_size) % update_interval: (step * batch_size) % update_interval + s.size(0)
+            ] = s
+
 
         # Optionally plot various simulation information
         if plot:
             # image = individual_image
-            image = batch["image"][0].view(3,32,32).permute(1, 2, 0)
+            image = batch["image"][0].view(1,28,28).permute(1, 2, 0)
             image = image / image.max()
-            inpt = inputs["X"][0][0].view(128, 8,8)
+            inpt = inputs["X"][0][0].view(128, 7, 7)
             # inpt = inputs["X"][0].sum(dim=0).view(128, 7, 7)#.view(time, 7*7*128).sum(0).view(7,7,128)
             # input_exc_weights = network.connections[("X", "Ae_0")].w
             # square_weights = get_square_weights(
@@ -300,6 +310,9 @@ for epoch in range(n_epochs):
             # )
             square_assignments = get_square_assignments(assignments, 100)
             spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            for key, value in spikes.items():
+                # Assuming 'value' is a torch.Tensor representing spikes
+                spikes_[key] = value.get("s")[0:n_neurons]  # Extracting spikes for the first image
             # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
             inpt = inpt.squeeze() 
             local_inpy = inpt.reshape(inpt.shape[0], -1)
@@ -313,22 +326,23 @@ for epoch in range(n_epochs):
             # voltage_ims, voltage_axes = plot_voltages(
             #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
             # )
-    
-            # plt.pause(1e-8)
 
+            # plt.pause(1e-8)
+        print(labels)
         network.reset_state_variables()  # Reset state variables
         pbar.set_description_str("Train progress: ")
         pbar.update()
         rstep=rstep+1
+        time.sleep(10)
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")
 
-# Load CIFAR-100 test data
-test_dataset = CIFAR100(
+# Load MNIST test data
+test_dataset = MNIST(
     # PoissonEncoder(time=time, dt=dt),
     None,
-    root=os.path.join("..", "..", "..", "data", "CIFAR100"),
+    root=os.path.join("..", "..", "..", "data", "MNIST"),
     train=False,
     download=True,
     transform=transforms.Compose(
@@ -353,7 +367,7 @@ for step, batch in enumerate(test_dataset):
         break
     CNN_out = VGGSmallFE(batch["encoded_image"])
     spike_train = encoder(CNN_out)
-    inputs = {"X": spike_train.view(int(time / dt), 1, 128,8,8).to(device)}
+    inputs = {"X": spike_train.view(int(time / dt), 1, 128,7,7).to(device)}
 
     # Run the network on the input
     network.run(inputs=inputs, time=time)
@@ -393,4 +407,4 @@ print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
 
 # Save the trained network weights
-torch.save(network.state_dict(), 'VGGSmall-SNNAugment(network).pth')
+torch.save(network.state_dict(), 'VGGSmall-SNNMNIST(network).pth')

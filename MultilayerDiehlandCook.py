@@ -77,7 +77,7 @@ class MultiLayerDiehlAndCook2015(Network):
                 traces=True,
                 rest=-65.0,
                 reset=-60.0,
-                thresh=exc_thresh,
+                thresh=exc_thresh,#+(i/10*exc_thresh),
                 refrac=5,
                 tc_decay=100.0,
                 tc_trace=20.0,
@@ -144,6 +144,11 @@ class MultiLayerDiehlAndCook2015(Network):
                 self.add_connection(input_exc_conn, source="X", target=f"Ae_{i}")
             else:
                 self.add_connection(input_exc_conn, source=f"Ae_{i-1}", target=f"Ae_{i}")
+                curr_l = i;
+                while((i-1)>0):
+                    i=i-1
+                    self.add_connection(input_exc_conn, source=f"Ae_{i-1}", target=f"Ae_{curr_l}")
+                    
         
             # Set the next input layer to the current excitatory layer
             input_layer = exc_layer

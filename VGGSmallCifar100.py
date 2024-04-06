@@ -23,9 +23,9 @@ import ssl
 class VGGSmall(nn.Module):
     def __init__(self, num_classes=100):
         super(VGGSmall, self).__init__()
-        self.features = self._make_layers([64, 64, 'M', 128, 128, 'M'])#, 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'])
+        self.features = self._make_layers([64, 64, 'M', 128, 'M', 256, 'M'])#, 512, 512, 'M', 512, 512, 'M'])
         self.classifier = nn.Sequential(
-            nn.Linear(128 *8 * 8, 4096),
+            nn.Linear(256 *4 * 4, 4096),
             nn.ReLU(True),
             nn.Dropout(),
             nn.Linear(4096, 4096),
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     # Hyperparameters
     learning_rate = 1e-4
     batch_size = 64
-    num_epochs = 10 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
+    num_epochs = 50 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
     
     # Load pretrain model & you may modify it
     model = VGGSmall(num_classes=100)

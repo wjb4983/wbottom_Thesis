@@ -33,6 +33,8 @@ from bindsnet.network.nodes import DiehlAndCookNodes, Input, LIFNodes
 from bindsnet.network.topology import Connection
 
 from MultilayerDiehlandCook import MultiLayerDiehlAndCook2015
+from plot_spikes_custom import plot_spikes_custom
+
 
 # class MultiLayerDiehlAndCook2015(Network):
 #     def __init__(
@@ -185,7 +187,7 @@ parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.add_argument("--new_model", type=int, default=0) #1 if you want new model, 0 if use pretrained model
-parser.add_argument("--num_layers", type=int, default=2)
+parser.add_argument("--num_layers", type=int, default=5)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -209,6 +211,8 @@ plot = args.plot
 gpu = args.gpu
 new_model = args.new_model
 num_layers=args.num_layers
+
+fig = []
 
 # Sets up Gpu use
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -314,7 +318,7 @@ assigns_im = None
 perf_ax = None
 voltage_axes, voltage_ims = None, None
 
-print(spikes.keys())
+# print(spikes.keys())
 print("Network layers:", network.layers)
 
 # Train the network.
@@ -421,7 +425,8 @@ for epoch in range(n_epochs):
             inpt_axes, inpt_ims = plot_input(
                 image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
             )
-            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
+            #Changes to custom plotting function
+            spike_ims, spike_axes, fig = plot_spikes_custom(spikes_, ims=spike_ims, axes=spike_axes)
             # weights_im = plot_weights(square_weights, im=weights_im)
             assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
@@ -434,8 +439,8 @@ for epoch in range(n_epochs):
         network.reset_state_variables()  # Reset state variables.
         non_negative_indices = torch.nonzero(assignments != -1).squeeze()
         # Print the indices and corresponding values
-        for index in non_negative_indices:
-            print(f"Index: {index}, Assignment: {assignments[index]}")
+        # for index in non_negative_indices:
+            # print(f"Index: {index}, Assignment: {assignments[index]}")
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")

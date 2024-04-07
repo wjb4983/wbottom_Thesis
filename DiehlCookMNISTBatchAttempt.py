@@ -24,9 +24,20 @@ from bindsnet.models import DiehlAndCook2015
 from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
 from bindsnet.network import Network
+from bindsnet.datasets.torchvision_wrapper import create_torchvision_dataset_wrapper#, TorchvisionDatasetWrapper
+
+class SortedMNIST(MNIST):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data, self.targets = self.sort_by_label(self.data, self.targets)
+
+    @staticmethod
+    def sort_by_label(data, targets):
+        sorted_indices = torch.argsort(targets)
+        return data[sorted_indices], targets[sorted_indices]
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--seed", type=int, default=1)
+parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=10)
 parser.add_argument("--n_test", type=int, default=10000)
@@ -117,8 +128,8 @@ else:
 if gpu:
     network.to("cuda")
 
-# Load MNIST data.
-train_dataset = MNIST(
+# Create the sorted dataset
+train_dataset = SortedMNIST(
     PoissonEncoder(time=time, dt=dt),
     None,
     root=os.path.join("..", "..","..", "data", "MNIST"),
@@ -129,19 +140,33 @@ train_dataset = MNIST(
     ),
 )
 #########################################################
-# Sort Data in case the program learns better when getting the same data
-sorted_train_dataset = []
+# # Sort Data in case the program learns better when getting the same data
+# train_dataset = list(train_dataset)
+# # train_dataset = sorted(train_dataset, key=lambda x: x[1])  # Assuming the label is at index 1
+
+# encoder = PoissonEncoder(time=time, dt=dt)
+
+# # # Sort the dataset by label.
+# # train_dataset = sorted(train_dataset, key=lambda x: x["label"])
+# train_dataset = create_torchvision_dataset_wrapper("MNIST_sorted")(
+#     image_encoder=encoder, label_encoder=None,  # Assuming `encoder` is your PoissonEncoder instance
+#     # root=os.path.join("..", "..","..", "data", "MNIST"),
+#     download=True,
+#     train=True,
+#     transform=transforms.Compose(
+#         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
+#     ),
+#     data=train_dataset
+# )
+
+# # Apply Poisson encoding to the sorted dataset.
+# # for item in train_dataset:
+#     # item["image"] = encoder(item["image"])  # Assuming `encoder` is your PoissonEncoder instance
+
+# # Optionally, you can convert it back to a PyTorch dataset object if needed.
+# train_dataset = torch.utils.data.Dataset(train_dataset)
 # for item in train_dataset:
-#     # print(item.shape)
-#     print(item.keys())
-
-# for data_label_tuple in train_dataset:
-#     # Unpack the data and label from the tuple
-#     data, label = data_label_tuple
-#     sorted_train_dataset.append((data, label))
-
-train_dataset = sorted(train_dataset, key=lambda x: x["label"])
-print("s")
+#     item["image"] = encoder(item["image"])  # Assuming `encoder` is your PoissonEncoder instance
 
 # Record spikes during the simulation.
 spike_record = torch.zeros((update_interval, int(time / dt), n_neurons), device=device)
@@ -200,7 +225,7 @@ for epoch in range(n_epochs):
 
     # Create a dataloader to iterate and batch data
     dataloader = torch.utils.data.DataLoader(
-        sorted_dataset, batch_size=batch_size, shuffle=False, num_workers=n_workers, pin_memory=gpu
+        train_dataset, batch_size=batch_size, shuffle=False, num_workers=n_workers, pin_memory=gpu
         # train_dataset, batch_size=batch_size, shuffle=True, num_workers=n_workers, pin_memory=gpu
     )
 
@@ -280,12 +305,12 @@ for epoch in range(n_epochs):
         exc_voltages = exc_voltage_monitor.get("v")
         inh_voltages = inh_voltage_monitor.get("v")
         s = spikes["Ae"].get("s").permute((1, 0, 2))
-        print(s.shape)
-        print(spike_record.shape)
-        s_in = spikes["X"].get("s")#.permute((1, 0, 2))
-        s_in = s_in.squeeze().reshape(250, 28, 28)
-        s_in = s_in.view(250, -1)
-        # Add to spikes recording.
+        # print(s.shape)
+        # print(spike_record.shape)
+        # s_in = spikes["X"].get("s")#.permute((1, 0, 2))
+        # s_in = s_in.squeeze().reshape(250, 28, 28)
+        # s_in = s_in.view(250, -1)
+        # # Add to spikes recording.
         # spike_record[step % update_interval] = spikes["Ae"].get("s").squeeze()
         # spike_record[
         #     (step * batch_size)
@@ -297,20 +322,20 @@ for epoch in range(n_epochs):
             ] = s
                 
         # s_permuted = s_in.permute((2, 1, 0))
-                # Create a plot
-        plt.figure(figsize=(10, 6))
+        #         # Create a plot
+        # plt.figure(figsize=(10, 6))
         
-        # Iterate over the dimensions to plot the spikes
-        for x in range(s_in.shape[0]):
-            for y in range(s_in.shape[1]):
-                # Check if there are spikes at this location
-                if s_in[x, y].sum() > 0:
-                    plt.scatter(x, y, color='black', marker='o')
+        # # Iterate over the dimensions to plot the spikes
+        # for x in range(s_in.shape[0]):
+        #     for y in range(s_in.shape[1]):
+        #         # Check if there are spikes at this location
+        #         if s_in[x, y].sum() > 0:
+        #             plt.scatter(x, y, color='black', marker='o')
         
-        # Set labels and title
-        plt.xlabel('Time Step')
-        plt.ylabel('Neuron Index')
-        plt.title('Spikes Plot')
+        # # Set labels and title
+        # plt.xlabel('Time Step')
+        # plt.ylabel('Neuron Index')
+        # plt.title('Spikes Plot')
         # Optionally plot various simulation information.
         if plot:
             image = batch["image"][0].view(1,28,28).permute(1, 2, 0)

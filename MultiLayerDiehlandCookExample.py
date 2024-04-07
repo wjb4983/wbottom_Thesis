@@ -426,7 +426,7 @@ for epoch in range(n_epochs):
                 image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
             )
             #Changes to custom plotting function
-            spike_ims, spike_axes, fig = plot_spikes_custom(spikes_, ims=spike_ims, axes=spike_axes)
+            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
             # weights_im = plot_weights(square_weights, im=weights_im)
             assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)

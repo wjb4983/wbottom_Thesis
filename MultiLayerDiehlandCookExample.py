@@ -421,6 +421,7 @@ for epoch in range(n_epochs):
             # )
             square_assignments = get_square_assignments(assignments, n_sqrt)
             spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            #TODO: NOW CALL LOOP FOR EVERY X LAYERS EACH SET OF X LAYERS CALLS PLOT_SPIUKES.  NEED LIST FOR ALL SPIKE_IMS ...
             # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
             inpt_axes, inpt_ims = plot_input(
                 image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims

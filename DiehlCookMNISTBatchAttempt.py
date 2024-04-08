@@ -56,7 +56,7 @@ parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.add_argument("--batch_size", type=int, default=50)
-parser.add_argument("--new_model", type=int, default="0") #1 if you want new model, 0 if use pretrained model
+parser.add_argument("--new_model", type=int, default="1") #1 if you want new model, 0 if use pretrained model
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()

@@ -25,23 +25,16 @@ from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
 from bindsnet.network import Network
 from bindsnet.datasets.torchvision_wrapper import create_torchvision_dataset_wrapper#, TorchvisionDatasetWrapper
+from SortedMNIST import SortedMNIST
 
-class SortedMNIST(MNIST):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.data, self.targets = self.sort_by_label(self.data, self.targets)
 
-    @staticmethod
-    def sort_by_label(data, targets):
-        sorted_indices = torch.argsort(targets)
-        return data[sorted_indices], targets[sorted_indices]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=10)
 parser.add_argument("--n_test", type=int, default=10000)
-parser.add_argument("--n_train", type=int, default=50000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -55,7 +48,7 @@ parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--batch_size", type=int, default=50)
+parser.add_argument("--batch_size", type=int, default=2)
 parser.add_argument("--new_model", type=int, default="1") #1 if you want new model, 0 if use pretrained model
 parser.set_defaults(plot=True, gpu=True)
 
@@ -234,7 +227,7 @@ for epoch in range(n_epochs):
             break
         # Get next input sample.
         # inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
-        inpts = {"X": batch["encoded_image"].reshape(int(time/dt), batch_size, 1, 28, 28)}
+        inpts = {"X": batch["encoded_image"].view(int(time/dt), batch_size, 1, 28, 28)}
         if gpu:
             # inputs = {k: v.cuda() for k, v in inputs.items()}
             inpts = {k: v.cuda() for k, v in inpts.items()}
@@ -295,7 +288,7 @@ for epoch in range(n_epochs):
 
         # labels.append(batch["label"])
         labels.extend(batch["label"].tolist())
-        print(labels)
+        # print(labels)
         # print(f"Step: {step}, Input Shape: {inpts['X'].shape}")
 
         # Run the network on the input.
@@ -340,33 +333,38 @@ for epoch in range(n_epochs):
         if plot:
             image = batch["image"][0].view(1,28,28).permute(1, 2, 0)
             image = image / image.max()
+            # plt.show(image.detach().clone().cpu().numpy())
             inpt = inpts["X"][0][0].view(1,28,28)
             inpt = inpt.squeeze() 
             local_inpy = inpt.reshape(inpt.shape[0], -1)
             spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            for batch_index in range(batch_size):
+                spikes_subset = {
+                    layer: spikes_[layer][:, batch_index:batch_index+1, :] for layer in spikes_ if layer != "X"
+                }
+                spikes_subset_x = {
+                    "X": spikes_["X"][:, batch_index:batch_index+1, :, :, :]
+                }
+                spikes_subset.update(spikes_subset_x)
+                spike_ims, spike_axes = plot_spikes(spikes_subset, ims=None, axes=None)
             
-            # curves, preds = update_curves(
-            #         curves, label_tensor, n_classes, spike_record=spike_record, assignments=assignments,
-            #         proportions=proportions, ngram_scores=ngram_scores, n=2
-            #     )
             # input_exc_weights = network.connections[("X", "Ae")].w
             # square_weights = get_square_weights(
             #     input_exc_weights.view(784, n_neurons), n_sqrt, 28
             # )
             # square_assignments = get_square_assignments(assignments, n_sqrt)
 
-            for key, value in spikes.items():
-                # Assuming 'value' is a torch.Tensor representing spikes
-                spikes_[key] = value.get("s")[:batch_size, 0]  # Extracting spikes for the first image
+            # for key, value in spikes.items():
+            #     # Assuming 'value' is a torch.Tensor representing spikes
+            #     spikes_[key] = value.get("s")[:batch_size, 0]  # Extracting spikes for the first image
             voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
             
-            # print(type(spike_record))
-            # spikes_ = spike_record[(step * batch_size) % update_interval]["Ae"].get("s")
+            # voltages_ = {"Ae": exc_voltages[0], "Ai": inh_voltages[0]}
+
             
             inpt_axes, inpt_ims = plot_input(
                 image, local_inpy, label=batch["label"][0], axes=inpt_axes, ims=inpt_ims
             )
-            spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
             # weights_im = plot_weights(square_weights, im=weights_im)
             # assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
@@ -416,7 +414,7 @@ for step, batch in enumerate(test_dataset):
         break
     # Get next input sample.
     # inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
-    inpts = {"X": batch["encoded_image"].reshape(int(time/dt), batch_size, 1, 28, 28)}
+    inpts = {"X": batch["encoded_image"].view(int(time/dt), batch_size, 1, 28, 28)}
     if gpu:
         inputs = {k: v.cuda() for k, v in inpts.items()}
 

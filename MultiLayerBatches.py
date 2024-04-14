@@ -35,144 +35,12 @@ from bindsnet.network.topology import Connection
 from MultilayerDiehlandCook import MultiLayerDiehlAndCook2015
 from plot_spikes_custom import plot_spikes_custom
 
-
-# class MultiLayerDiehlAndCook2015(Network):
-#     def __init__(
-#         self,
-#         n_inpt: int,
-#         n_neurons: int = 100,
-#         num_layers: int = 10,
-#         exc: float = 22.5,
-#         inh: float = 17.5,
-#         dt: float = 1.0,
-#         nu: Optional[Union[float, Sequence[float]]] = (1e-4, 1e-2),
-#         reduction: Optional[callable] = None,
-#         wmin: float = 0.0,
-#         wmax: float = 1.0,
-#         norm: float = 78.4,
-#         theta_plus: float = 0.05,
-#         tc_theta_decay: float = 1e7,
-#         inpt_shape: Optional[Iterable[int]] = None,
-#         inh_thresh: float = -40.0,
-#         exc_thresh: float = -52.0,
-#     ) -> None:
-#         super().__init__(dt=dt)
-
-#         self.n_inpt = n_inpt
-#         self.inpt_shape = inpt_shape
-#         self.n_neurons = n_neurons
-#         self.num_layers = num_layers
-#         self.exc = exc
-#         self.inh = inh
-#         self.dt = dt
-        
-#         # Layers and connections lists
-#         self.input_layers = []
-#         self.exc_layers = []
-#         self.inh_layers = []
-#         self.input_exc_connections = []
-#         self.exc_inh_connections = []
-#         self.inh_exc_connections = []
-#         layer_names = []
-        
-#         # Create input layer
-#         input_layer = Input(
-#             n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
-#         )
-#         self.input_layers.append(input_layer)
-#         layer_names.append("X")
-#         self.add_layer(input_layer, name="X")
-        
-        
-#         for i in range(self.num_layers):
-#             print(i)
-#             # Create excitatory layer
-#             exc_layer = DiehlAndCookNodes(
-#                 n=self.n_neurons,
-#                 traces=True,
-#                 rest=-65.0,
-#                 reset=-60.0,
-#                 thresh=exc_thresh,
-#                 refrac=5,
-#                 tc_decay=100.0,
-#                 tc_trace=20.0,
-#                 theta_plus=theta_plus,
-#                 tc_theta_decay=tc_theta_decay,
-#             )
-#             self.exc_layers.append(exc_layer)
-#             layer_names.append(f"Ae_{i}")
-        
-#             # Create inhibitory layer
-#             inh_layer = LIFNodes(
-#                 n=self.n_neurons,
-#                 traces=False,
-#                 rest=-60.0,
-#                 reset=-45.0,
-#                 thresh=inh_thresh,
-#                 tc_decay=10.0,
-#                 refrac=2,
-#                 tc_trace=20.0,
-#             )
-#             self.inh_layers.append(inh_layer)
-#             layer_names.append(f"Ai_{i}")
-            
-            
-#             self.add_layer(exc_layer, name=f"Ae_{i}")
-#             self.add_layer(inh_layer, name=f"Ai_{i}")
-        
-#             # Create connections
-#             # Create connections
-#             if i == 0:  # If it's the first layer
-#                 w_input_exc = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
-#                 source_layer = "X"  # Source is the input layer
-#             else:
-#                 w_input_exc = 0.3 * torch.rand(self.n_neurons, self.n_neurons)
-#                 source_layer = f"Ae_{i-1}"  # Source is the previous excitatory layer
-            
-#             input_exc_conn = Connection(
-#                 source=self.layers[source_layer],  # Use the appropriate source layer
-#                 target=exc_layer,
-#                 w=w_input_exc,
-#                 update_rule=PostPre,
-#                 nu=nu,
-#                 reduction=reduction,
-#                 wmin=wmin,
-#                 wmax=wmax,
-#                 norm=norm,
-#                 )
-#             self.input_exc_connections.append(input_exc_conn)
-        
-#             w_exc_inh = self.exc * torch.diag(torch.ones(self.n_neurons))
-#             exc_inh_conn = Connection(
-#                 source=exc_layer, target=inh_layer, w=w_exc_inh, wmin=0, wmax=self.exc
-#             )
-#             self.exc_inh_connections.append(exc_inh_conn)
-        
-#             w_inh_exc = -self.inh * (
-#                 torch.ones(self.n_neurons, self.n_neurons)
-#                 - torch.diag(torch.ones(self.n_neurons))
-#             )
-#             inh_exc_conn = Connection(
-#                 source=inh_layer, target=exc_layer, w=w_inh_exc, wmin=-self.inh, wmax=0
-#             )
-#             self.inh_exc_connections.append(inh_exc_conn)
-#             if(i==0):
-#                 self.add_connection(input_exc_conn, source="X", target=f"Ae_{i}")
-#             else:
-#                 self.add_connection(input_exc_conn, source=f"Ae_{i-1}", target=f"Ae_{i}")
-#             self.add_connection(exc_inh_conn, source=f"Ae_{i}", target=f"Ai_{i}")
-#             self.add_connection(inh_exc_conn, source=f"Ai_{i}", target=f"Ae_{i}")
-        
-#             # Set the next input layer to the current excitatory layer
-#             input_layer = exc_layer
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
 parser.add_argument("--n_epochs", type=int, default=1)
-parser.add_argument("--n_test", type=int, default=1000)
-parser.add_argument("--n_train", type=int, default=10000)
+parser.add_argument("--n_test", type=int, default=10000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
@@ -181,13 +49,14 @@ parser.add_argument("--time", type=int, default=250)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--update_interval", type=int, default=250)
+parser.add_argument("--update_interval", type=int, default=500)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.add_argument("--new_model", type=int, default=0) #1 if you want new model, 0 if use pretrained model
-parser.add_argument("--num_layers", type=int, default=5)
+parser.add_argument("--num_layers", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=100)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -206,11 +75,12 @@ dt = args.dt
 intensity = args.intensity
 progress_interval = args.progress_interval
 update_interval = args.update_interval
-train = args.train
+train = True
 plot = args.plot
 gpu = args.gpu
 new_model = args.new_model
 num_layers=args.num_layers
+batch_size = args.batch_size
 
 fig = []
 
@@ -243,7 +113,7 @@ start_intensity = intensity
 network = MultiLayerDiehlAndCook2015(
     n_inpt=784,
     n_neurons=n_neurons,
-    num_layers=num_layers,
+    # num_layers=num_layers,
     exc=exc,
     inh=inh,
     dt=dt,
@@ -251,6 +121,16 @@ network = MultiLayerDiehlAndCook2015(
     theta_plus=theta_plus,
     inpt_shape=(1, 28, 28),
 )
+# network = DiehlAndCook2015(
+#     n_inpt=784,
+#     n_neurons=n_neurons,
+#     exc=exc,
+#     inh=inh,
+#     dt=dt,
+#     norm=78.4,
+#     theta_plus=theta_plus,
+#     inpt_shape=(1, 28, 28),
+# )
 
 if os.path.isfile("Multidiehlcook.pth"):
     print("=======================================\nUsing Multidiehlcook.pth found on your computer\n============================")
@@ -262,8 +142,20 @@ else:
 if gpu:
     network.to("cuda")
 
-# Load MNIST data.
-train_dataset = MNIST(
+# # Load MNIST data.
+# train_dataset = MNIST(
+#     PoissonEncoder(time=time, dt=dt),
+#     None,
+#     root=os.path.join("..", "..","..", "data", "MNIST"),
+#     download=True,
+#     train=True,
+#     transform=transforms.Compose(
+#         [transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)]
+#     ),
+# )
+
+from SortedMNIST import SortedMNIST
+train_dataset = SortedMNIST(
     PoissonEncoder(time=time, dt=dt),
     None,
     root=os.path.join("..", "..","..", "data", "MNIST"),
@@ -286,15 +178,11 @@ rates = torch.zeros((n_neurons, n_classes), device=device)
 # Sequence of accuracy estimates.
 accuracy = {"all": [], "proportion": []}
 
-# Voltage recording for excitatory and inhibitory layers.
-# exc_voltage_monitor = Monitor(
-#     network.layers["Ae"], ["v"], time=int(time / dt), device=device
+
+# last_layer_vm = Monitor(
+#     network.layers[f"Ae_{num_layers-1}"], ["v"], time=int(time / dt), device=device
 # )
-# inh_voltage_monitor = Monitor(
-#     network.layers["Ai"], ["v"], time=int(time / dt), device=device
-# )
-# network.add_monitor(exc_voltage_monitor, name="exc_voltage")
-# network.add_monitor(inh_voltage_monitor, name="inh_voltage")
+# network.add_monitor(last_layer_vm, name="last_layer_v")
 
 # Set up monitors for spikes and voltages
 #will hold the array of axes and ims to be called for each set of 2 layers
@@ -308,12 +196,11 @@ for layer in set(network.layers):
     )
     network.add_monitor(spikes[layer], name="%s_spikes" % layer)
 
-# voltages = {}
-# for layer in set(network.layers) - {"X"}:
-#     voltages[layer] = Monitor(
-#         network.layers[layer], state_vars=["v"], time=int(time / dt), device=device
-#     )
-#     network.add_monitor(voltages[layer], name="%s_voltages" % layer)
+voltages = {}
+# voltages[f"Ae_{num_layers-1}"] = Monitor(
+#     network.layers[f"Ae_{num_layers-1}"], state_vars=["v"], time=int(time / dt), device=device
+# )
+# network.add_monitor(voltages[f"Ae_{num_layers-1}"], name=f"%Ae_{num_layers-1}_voltages")
 
 inpt_ims, inpt_axes = None, None
 
@@ -328,6 +215,16 @@ print("Network layers:", network.layers)
 # Train the network.
 print("\nBegin training.\n")
 start = t()
+for connection_name, connection in network.connections.items():
+    print(f"Connection Name: {connection_name}")
+    
+    source_name = getattr(connection.source, "name", None)
+    target_name = getattr(connection.target, "name", None)
+    
+    print(f"Source Layer: {source_name}")
+    print(f"Target Layer: {target_name}")
+    print(f"Weight Matrix Shape: {connection.w.shape}")
+    print("=" * 30)
 for epoch in range(n_epochs):
     labels = []
 
@@ -337,18 +234,19 @@ for epoch in range(n_epochs):
 
     # Create a dataloader to iterate and batch data
     dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=n_workers, pin_memory=gpu
+        train_dataset, batch_size=batch_size, shuffle=False, num_workers=n_workers, pin_memory=gpu
     )
 
     for step, batch in enumerate(tqdm(dataloader)):
-        if step > n_train:
+        if (step+1) * batch_size > n_train:
             break
         # Get next input sample.
-        inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
+        inputs = {"X": batch["encoded_image"].view(int(time/dt), batch_size, 1, 28, 28)}
+        # print(inputs["X"].shape)
         if gpu:
             inputs = {k: v.cuda() for k, v in inputs.items()}
 
-        if step % update_interval == 0 and step > 0:
+        if (step) * batch_size % update_interval == 0 and step > 0:
             # Convert the array of labels into a tensor
             label_tensor = torch.tensor(labels, device=device)
 
@@ -403,35 +301,46 @@ for epoch in range(n_epochs):
 
             labels = []
 
-        labels.append(batch["label"])
+        labels.extend(batch["label"].tolist())
 
         # Run the network on the input.
-        network.run(inputs=inputs, time=time)
+        network.run(inputs=inputs, time=time)#, reward=10)
 
-        # Get voltage recording.
-        # exc_voltages = exc_voltage_monitor.get("v")
-        # inh_voltages = inh_voltage_monitor.get("v")
+        # last_layer_v = last_layer_vm.get("v")
+        # s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
+        s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
 
         # Add to spikes recording.
-        spike_record[step % update_interval] = spikes[f"Ae_{num_layers-1}"].get("s").squeeze()
+        spike_record[
+            (step * batch_size) % update_interval: (step * batch_size) % update_interval + s.size(0)
+            ] = s
 
         # Optionally plot various simulation information.
         if plot:
-            image = batch["image"].view(28, 28)
-            inpt = inputs["X"].view(time, 784).sum(0).view(28, 28)
+            image = batch["image"][0].view(28, 28)
+            # inpt = inputs["X"].view(time, 784).sum(0).view(28, 28)
             # input_exc_weights = network.connections[("X", "Ae")].w
             # square_weights = get_square_weights(
             #     input_exc_weights.view(784, n_neurons), n_sqrt, 28
             # )
             square_assignments = get_square_assignments(assignments, n_sqrt)
             spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
-            # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
-            inpt_axes, inpt_ims = plot_input(
-                image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
-            )
+            # voltages = {f"Ae_{num_layers-1}" : last_layer_v}
+            # inpt_axes, inpt_ims = plot_input(
+            #     image, inpt, label=batch["label"], axes=inpt_axes, ims=inpt_ims
+            # )
             #Changes to custom plotting function
             ###########################################################
             #CUSTOM PLOTTING - 2 PER PLOT
+            spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
+            spikes_subset = {
+                layer: spikes_[layer][:, 0:1, :] for layer in spikes_ if layer != "X"
+            }
+            spikes_subset_x = {
+                "X": spikes_["X"][:, 0:1, :, :, :]
+            }
+            spikes_subset.update(spikes_subset_x)
+            spikes_ = spikes_subset
             keys = list(spikes_.keys())
             for i in range(0, len(keys), 2):
                 # Get two consecutive layers from spikes_
@@ -487,19 +396,23 @@ test_dataset = MNIST(
 accuracy = {"all": 0, "proportion": 0}
 
 # Record spikes during the simulation.
-spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
+spike_record = torch.zeros((batch_size, int(time / dt), n_neurons), device=device)
 
 # Train the network.
 print("\nBegin testing\n")
 network.train(mode=False)
 start = t()
+labels = []
 
 pbar = tqdm(total=n_test, position=0, leave=True)
-for step, batch in enumerate(test_dataset):
-    if step >= n_test:
+dataloader = torch.utils.data.DataLoader(
+    test_dataset, batch_size=batch_size, shuffle=True, num_workers=n_workers, pin_memory=gpu
+)
+for step, batch in enumerate(dataloader):
+    if (step+1) * batch_size > n_test:
         break
     # Get next input sample.
-    inputs = {"X": batch["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
+    inputs = {"X": batch["encoded_image"].view(int(time / dt), batch_size, 1, 28, 28)}
     if gpu:
         inputs = {k: v.cuda() for k, v in inputs.items()}
 
@@ -507,10 +420,15 @@ for step, batch in enumerate(test_dataset):
     network.run(inputs=inputs, time=time)
 
     # Add to spikes recording.
-    spike_record[0] = spikes[f"Ae_{num_layers-1}"].get("s").squeeze()
+    s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
+
+    # Add to spikes recording.
+    spike_record = s
 
     # Convert the array of labels into a tensor
-    label_tensor = torch.tensor(batch["label"], device=device)
+    # label_tensor = torch.tensor(batch["label"], device=device)
+    labels = batch["label"].tolist()
+    label_tensor = torch.tensor(labels, device=device)
 
     # Get network predictions.
     all_activity_pred = all_activity(
@@ -539,3 +457,4 @@ print("Proportion weighting accuracy: %.2f \n" % (accuracy["proportion"] / n_tes
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Testing complete.\n")
 
+torch.save(network.state_dict(), 'MultiLayerBatch1Epoch.pth')

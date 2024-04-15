@@ -40,7 +40,7 @@ parser.add_argument("--time", type=int, default=100)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--num_layers", type=int, default=1)
+parser.add_argument("--num_layers", type=int, default=2)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
@@ -146,7 +146,7 @@ accuracy = {"all": [], "proportion": []}
 
 # Voltage recording for excitatory and inhibitory layers.
 exc_voltage_monitor = Monitor(
-    network.layers[f"Ae_{num_layers-1}"], ["v"], time=int(time / dt), device=device
+    network.layers[f"Ae_{num_layers-2}"], ["v"], time=int(time / dt), device=device
 )
 # inh_voltage_monitor = Monitor(
 #     network.layers[f"Ai_{num_layers-1}"], ["v"], time=int(time / dt), device=device
@@ -295,7 +295,7 @@ for epoch in range(n_epochs):
         network.run(inputs=inputs, time=time)
 
         # Add to spikes recording.
-        s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
+        s = spikes[f"Ae_{num_layers-2}"].get("s").permute((1, 0, 2))
         spike_record[
             (step * batch_size)
             % update_interval : (step * batch_size % update_interval)
@@ -311,7 +311,7 @@ for epoch in range(n_epochs):
             image = batch["image"][:, 0].view(28, 28)
             inpt = inputs["X"][:, 0].view(time, 784).sum(0).view(28, 28)
             lable = batch["label"][0]
-            input_exc_weights = network.connections[("X", f"Ae_{num_layers-1}")].w
+            input_exc_weights = network.connections[("X", f"Ae_0")].w
             square_weights = get_square_weights(
                 input_exc_weights.view(784, n_neurons), n_sqrt, 28
             )
@@ -339,7 +339,7 @@ for epoch in range(n_epochs):
                         ims=ims[i], axes=axes[i]
                     )
 #################################################################################
-            voltages = {f"Ae_{num_layers-1}": exc_voltages}#, f"Ai_{num_layers-1}": inh_voltages}
+            voltages = {f"Ae_{num_layers-2}": exc_voltages}#, f"Ai_{num_layers-1}": inh_voltages}
             inpt_axes, inpt_ims = plot_input(
                 image, inpt, label=lable, axes=inpt_axes, ims=inpt_ims
             )

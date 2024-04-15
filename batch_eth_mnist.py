@@ -294,7 +294,7 @@ for epoch in range(n_epochs):
                 voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
             )
 
-            plt.pause(1e-8)
+            # plt.pause(1e-8)
 
         network.reset_state_variables()  # Reset state variables.
         pbar_training.update(batch_size)

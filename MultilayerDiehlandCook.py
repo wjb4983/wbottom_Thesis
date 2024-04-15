@@ -264,8 +264,8 @@ class MultiLayerDiehlAndCook2015(Network):
                 exc_layer = DiehlAndCookNodes(
                     n=self.n_neurons,
                     traces=True,
-                    rest=-65.0,
-                    reset=-60.0,
+                    rest=-15.0,
+                    reset=-10.0,
                     thresh=exc_thresh,
                     refrac=5,
                     tc_decay=100.0,
@@ -288,10 +288,10 @@ class MultiLayerDiehlAndCook2015(Network):
                 reduction=reduction,
                 wmin=wmin,
                 wmax=wmax,
-                norm=norm,
+                norm=norm*10,
             )
             if(i>0 and i< num_layers-1):
-                input_exc_conn.norm = norm/10
+                input_exc_conn.norm = norm/50
             input_exc_conn.update_rule.reduction = torch.sum
 
     

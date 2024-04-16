@@ -27,15 +27,15 @@ from bindsnet.utils import get_square_assignments, get_square_weights
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
 parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
-parser.add_argument("--n_updates", type=int, default=60)
+parser.add_argument("--n_updates", type=int, default=40)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
-parser.add_argument("--theta_plus", type=float, default=0.05)
+parser.add_argument("--theta_plus", type=float, default=1.0)
 parser.add_argument("--time", type=int, default=100)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
@@ -202,7 +202,6 @@ for connection_name, connection in network.connections.items():
     print(f"Weight Matrix Shape: {connection.w.shape}")
     print("=" * 30)
     
-    
 print("\nBegin training...")
 start = t()
 
@@ -311,7 +310,8 @@ for epoch in range(n_epochs):
             image = batch["image"][:, 0].view(28, 28)
             inpt = inputs["X"][:, 0].view(time, 784).sum(0).view(28, 28)
             lable = batch["label"][0]
-            input_exc_weights = network.connections[("X", f"Ae_0")].w
+            input_exc_weights = network.connections[("X", f"Ae_0")].w#[(F"Ae_0", f"Ae_1")].w
+            # print(input_exc_weights)
             square_weights = get_square_weights(
                 input_exc_weights.view(784, n_neurons), n_sqrt, 28
             )
@@ -322,6 +322,7 @@ for epoch in range(n_epochs):
             keys = list(spikes_.keys())
             for i in range(0, len(keys), 2):
                 # Get two consecutive layers from spikes_
+                
                 layer1_key = keys[i]
                 layer2_key = keys[i + 1] if i + 1 < len(keys) else None
                 
@@ -329,12 +330,14 @@ for epoch in range(n_epochs):
                 layer1_spikes = spikes_[layer1_key]
                 layer2_spikes = spikes_[layer2_key] if layer2_key else None
                 if(layer2_spikes == None):
-                    ims[i], axes[i] = plot_spikes(
+                    #ims[i], axes[i]
+                    x, y = plot_spikes(
                         {layer1_key: layer1_spikes},
                         ims=ims[i], axes=axes[i]
                     )
                 else:
-                    ims[i], axes[i] = plot_spikes(
+                    # ims[i], axes[i]
+                    x, y= plot_spikes(
                         {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
                         ims=ims[i], axes=axes[i]
                     )

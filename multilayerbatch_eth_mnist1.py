@@ -27,21 +27,16 @@ from bindsnet.utils import get_square_assignments, get_square_weights
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--batch_size", type=int, default=256)
+parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
 parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
-parser.add_argument("--n_updates", type=int, default=40)
+parser.add_argument("--n_updates", type=int, default=80)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
-<<<<<<< HEAD
-parser.add_argument("--theta_plus", type=float, default=0.05)
-parser.add_argument("--time", type=int, default=250)
-=======
 parser.add_argument("--theta_plus", type=float, default=1.0)
 parser.add_argument("--time", type=int, default=100)
->>>>>>> 305f09e3ce45eac8e8e0435dbf54093299fa9726
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
@@ -151,13 +146,13 @@ accuracy = {"all": [], "proportion": []}
 
 # Voltage recording for excitatory and inhibitory layers.
 exc_voltage_monitor = Monitor(
+    network.layers[f"Ae_{num_layers-1}"], ["v"], time=int(time / dt), device=device
+)
+inh_voltage_monitor = Monitor(
     network.layers[f"Ae_{num_layers-2}"], ["v"], time=int(time / dt), device=device
 )
-# inh_voltage_monitor = Monitor(
-#     network.layers[f"Ai_{num_layers-1}"], ["v"], time=int(time / dt), device=device
-# )
 network.add_monitor(exc_voltage_monitor, name="exc_voltage")
-# network.add_monitor(inh_voltage_monitor, name="inh_voltage")
+network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 
 # Set up monitors for spikes and voltages
 # spikes = {}
@@ -299,7 +294,7 @@ for epoch in range(n_epochs):
         network.run(inputs=inputs, time=time)
 
         # Add to spikes recording.
-        s = spikes[f"Ae_{num_layers-2}"].get("s").permute((1, 0, 2))
+        s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
         spike_record[
             (step * batch_size)
             % update_interval : (step * batch_size % update_interval)
@@ -308,7 +303,7 @@ for epoch in range(n_epochs):
 
         # Get voltage recording.
         exc_voltages = exc_voltage_monitor.get("v")
-        # inh_voltages = inh_voltage_monitor.get("v")
+        inh_voltages = inh_voltage_monitor.get("v")
 
         # Optionally plot various simulation information.
         if plot:
@@ -324,34 +319,35 @@ for epoch in range(n_epochs):
             spikes_ = {
                 layer: spikes[layer].get("s")[:, 0].contiguous() for layer in spikes
             }
-            keys = list(spikes_.keys())
-            for i in range(0, len(keys), 2):
-                # Get two consecutive layers from spikes_
+            # keys = list(spikes_.keys())
+            # for i in range(0, len(keys), 3):
+            #     # Get two consecutive layers from spikes_
                 
-                layer1_key = keys[i]
-                layer2_key = keys[i + 1] if i + 1 < len(keys) else None
+            #     layer1_key = keys[i]
+            #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
                 
-                # Get the spike data for the current layers
-                layer1_spikes = spikes_[layer1_key]
-                layer2_spikes = spikes_[layer2_key] if layer2_key else None
-                if(layer2_spikes == None):
-                    #ims[i], axes[i]
-                    x, y = plot_spikes(
-                        {layer1_key: layer1_spikes},
-                        ims=ims[i], axes=axes[i]
-                    )
-                else:
-                    # ims[i], axes[i]
-                    x, y= plot_spikes(
-                        {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
-                        ims=ims[i], axes=axes[i]
-                    )
+            #     # Get the spike data for the current layers
+            #     layer1_spikes = spikes_[layer1_key]
+            #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
+            #     if(layer2_spikes == None):
+            #         #ims[i], axes[i]
+            #         x, y = plot_spikes(
+            #             {layer1_key: layer1_spikes},
+            #             ims=ims[i], axes=axes[i]
+            #         )
+            #     else:
+            #         # ims[i], axes[i]
+            #         x, y= plot_spikes(
+            #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
+            #             ims=ims[i], axes=axes[i]
+            #         )
 #################################################################################
-            voltages = {f"Ae_{num_layers-2}": exc_voltages}#, f"Ai_{num_layers-1}": inh_voltages}
+            voltages = {f"Ae_{num_layers-1}": exc_voltages, f"Ae_{num_layers-2}": inh_voltages}#, f"Ai_{num_layers-1}": inh_voltages}
             inpt_axes, inpt_ims = plot_input(
                 image, inpt, label=lable, axes=inpt_axes, ims=inpt_ims
             )
-            # spike_ims, spike_axes = plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
+            # spike_ims, spike_axes 
+            x,y= plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
             weights_im = plot_weights(square_weights, im=weights_im)
             assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(

@@ -82,13 +82,13 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
         )
-        w = exc * 3* torch.rand(self.n_inpt, self.n_neurons)
+        w = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
         input_middle = Connection(
             source=input_layer,
             target=exc_layer_1,
             w=w,
             update_rule=PostPre,
-            nu=(1e-4,0),
+            nu=(1e-4,1e-2),
             reduction=reduction,
             wmin=wmin,
             wmax=exc*3,
@@ -110,7 +110,7 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
             )
-        w = exc * torch.rand(self.n_neurons, self.n_neurons)
+        w = 0.3 * torch.rand(self.n_neurons, self.n_neurons)
         nu = (1e-4, 1e-2)
         middle_end = Connection(
             source=exc_layer_1,

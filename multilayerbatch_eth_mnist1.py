@@ -26,8 +26,8 @@ from bindsnet.utils import get_square_assignments, get_square_weights
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
-parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--n_neurons", type=int, default=200)
+parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
 parser.add_argument("--n_train", type=int, default=60000)
@@ -35,7 +35,7 @@ parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--n_updates", type=int, default=80)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
-parser.add_argument("--theta_plus", type=float, default=1.0)
+parser.add_argument("--theta_plus", type=float, default=.05)
 parser.add_argument("--time", type=int, default=100)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
@@ -304,7 +304,15 @@ for epoch in range(n_epochs):
         # Get voltage recording.
         exc_voltages = exc_voltage_monitor.get("v")
         inh_voltages = inh_voltage_monitor.get("v")
-
+        
+        w1 = network.connections[(f"Ae_0", f"Ae_1")].w
+        w2 = network.connections[(f"Ae_0_0", f"Ae_1")].w
+        w3= network.connections[("X", f"Ae_0")].w
+        w4= network.connections[("X", f"Ae_0_0")].w
+        print(w1.mean().item())
+        print(w2.mean().item())
+        print(w3.mean().item())
+        print(w4.mean().item())
         # Optionally plot various simulation information.
         if plot:
             image = batch["image"][:, 0].view(28, 28)
@@ -353,7 +361,8 @@ for epoch in range(n_epochs):
             perf_ax = plot_performance(
                 accuracy, x_scale=update_steps * batch_size, ax=perf_ax
             )
-            voltage_ims, voltage_axes = plot_voltages(
+            # voltage_ims, voltage_axes 
+            z,c= plot_voltages(
                 voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
             )
 

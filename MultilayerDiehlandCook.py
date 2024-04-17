@@ -33,6 +33,7 @@ class MultiLayerDiehlAndCook2015(Network):
         exc_thresh: float = -52.0,
         redundancy: bool = False,
         last_layer_inh: bool = False,
+        seed: int = 0,
     ) -> None:
         # language=rst
         """
@@ -65,7 +66,8 @@ class MultiLayerDiehlAndCook2015(Network):
         self.exc = exc
         self.inh = inh
         self.dt = dt
-
+        torch.manual_seed(seed)
+        np.random.seed(seed)
         # Layers
         input_layer = Input(
             n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
@@ -82,16 +84,16 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
         )
-        w = 0.3 * torch.rand(self.n_inpt, self.n_neurons)
+        w = 0.6 * torch.rand(self.n_inpt, self.n_neurons)
         input_middle = Connection(
             source=input_layer,
             target=exc_layer_1,
             w=w,
             update_rule=PostPre,
-            nu=(1e-4,1e-2),
+            nu=(1e-5,1e-2),
             reduction=reduction,
             wmin=wmin,
-            wmax=exc*3,
+            wmax=wmax*3,
             # norm=1,
             )
         input_middle.update_rule.reduction = torch.sum
@@ -110,8 +112,7 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
             )
-        w = 0.3 * torch.rand(self.n_neurons, self.n_neurons)
-        nu = (1e-4, 1e-2)
+        w = 1.76*2 * torch.rand(self.n_neurons, self.n_neurons)
         middle_end = Connection(
             source=exc_layer_1,
             target=exc_layer_2,
@@ -120,12 +121,56 @@ class MultiLayerDiehlAndCook2015(Network):
             nu=(1e-4,1e-2),
             reduction=reduction,
             wmin=wmin,
-            wmax=exc,
+            wmax=wmax*5,
             # norm=norm,
             )
         middle_end.update_rule.reduction = torch.sum
         self.add_layer(exc_layer_2, f"Ae_1")
         self.add_connection(middle_end, source=f"Ae_0", target=f"Ae_1")
+
+        exc_layer_1_1 = DiehlAndCookNodes(
+            n=self.n_neurons,
+            traces=True,
+            rest=-65.0,
+            reset=-60.0,
+            thresh=exc_thresh,
+            refrac=5,
+            tc_decay=100.0,
+            tc_trace=20.0,
+            theta_plus=theta_plus,
+            tc_theta_decay=tc_theta_decay,
+        )
+        w = 0.7 * torch.rand(self.n_inpt, self.n_neurons)
+        input_middle_1 = Connection(
+            source=input_layer,
+            target=exc_layer_1,
+            w=w,
+            update_rule=PostPre,
+            nu=(1e-5,1e-2),
+            reduction=reduction,
+            wmin=wmin,
+            wmax=wmax*3,
+            # norm=1,
+            )
+        input_middle_1.update_rule.reduction = torch.sum
+        self.add_layer(input_layer, "X")
+        self.add_layer(exc_layer_1_1, f"Ae_0_0")
+        self.add_connection(input_middle_1, source="X", target=f"Ae_0_0")
+        
+        w = 3.0 * torch.rand(self.n_neurons, self.n_neurons)
+        middle_end_1 = Connection(
+            source=exc_layer_1_1,
+            target=exc_layer_2,
+            w=w,
+            update_rule=PostPre,
+            nu=(1e-4,1e-2),
+            reduction=reduction,
+            wmin=wmin,
+            wmax=wmax*5,
+            # norm=norm,
+            )
+        middle_end_1.update_rule.reduction = torch.sum
+        self.add_connection(middle_end_1, source=f"Ae_0_0", target=f"Ae_1")
         # for i in range(num_layers):
         #     if(i == num_layers - 1):
         #         exc_layer = DiehlAndCookNodes(

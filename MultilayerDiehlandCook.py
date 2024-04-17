@@ -84,16 +84,16 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
         )
-        w = 0.6 * torch.rand(self.n_inpt, self.n_neurons)
+        w = 0.7*2 * torch.rand(self.n_inpt, self.n_neurons)
         input_middle = Connection(
             source=input_layer,
             target=exc_layer_1,
             w=w,
             update_rule=PostPre,
-            nu=(1e-5,1e-2),
+            nu=(1e-4,1e-2),
             reduction=reduction,
             wmin=wmin,
-            wmax=wmax*3,
+            wmax=wmax*1.5,
             # norm=1,
             )
         input_middle.update_rule.reduction = torch.sum
@@ -118,10 +118,10 @@ class MultiLayerDiehlAndCook2015(Network):
             target=exc_layer_2,
             w=w,
             update_rule=PostPre,
-            nu=(1e-4,1e-2),
+            nu=(1e-10,1e-3),
             reduction=reduction,
             wmin=wmin,
-            wmax=wmax*5,
+            wmax=wmax*2.5,
             # norm=norm,
             )
         middle_end.update_rule.reduction = torch.sum
@@ -140,16 +140,16 @@ class MultiLayerDiehlAndCook2015(Network):
             theta_plus=theta_plus,
             tc_theta_decay=tc_theta_decay,
         )
-        w = 0.7  * torch.rand(self.n_inpt, self.n_neurons)
+        w = 0.7*2  * torch.rand(self.n_inpt, self.n_neurons)
         input_middle_1 = Connection(
             source=input_layer,
             target=exc_layer_1,
             w=w,
             update_rule=PostPre,
-            nu=(1e-5,1e-2),
+            nu=(1e-4,1e-2),
             reduction=reduction,
             wmin=wmin,
-            wmax=wmax*3,
+            wmax=wmax*1.5,
             # norm=1,
             )
         input_middle_1.update_rule.reduction = torch.sum
@@ -163,10 +163,10 @@ class MultiLayerDiehlAndCook2015(Network):
             target=exc_layer_2,
             w=w,
             update_rule=PostPre,
-            nu=(1e-4,1e-2),
+            nu=(1e-10,1e-3),
             reduction=reduction,
             wmin=wmin,
-            wmax=wmax*5,
+            wmax=wmax*2.5,
             # norm=norm,
             )
         middle_end_1.update_rule.reduction = torch.sum

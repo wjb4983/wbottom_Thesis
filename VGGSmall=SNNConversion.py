@@ -14,6 +14,7 @@ import torchvision  # torch package for vision related things
 import torchvision.datasets as datasets  # Has standard datasets we can import in a nice way
 import torchvision.transforms as transforms  # Transformations we can perform on our dataset
 from PIL import Image
+from bindsnet.conversion import ann_to_snn
 
 # This is for the progress bar.
 from tqdm.auto import tqdm
@@ -78,7 +79,7 @@ if __name__ == '__main__':
     )
     
     # Load Data
-    batch_size = 64
+    batch_size = 32
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
@@ -101,8 +102,8 @@ if __name__ == '__main__':
     
     # Hyperparameters
     learning_rate = 1e-4
-    batch_size = 256
-    num_epochs = 2 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
+    batch_size = 32
+    num_epochs = 1 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
     
     # Load pretrain model & you may modify it
     model = VGGSmall(num_classes=10)
@@ -160,7 +161,10 @@ if __name__ == '__main__':
     
         model.train()
     
-    check_accuracy(train_loader, model)
-    check_accuracy(val_loader, model)
+    # check_accuracy(train_loader, model)
+    # check_accuracy(val_loader, model)
+    model.to("cpu")
+    # snn = ann_to_snn(model, (1,28,28))
+    # print(snn)
+    torch.save(model.state_dict(), 'presnn_conversion.pth')
     
-    torch.save(model.state_dict(), 'VGGSmallMNIST.pth')

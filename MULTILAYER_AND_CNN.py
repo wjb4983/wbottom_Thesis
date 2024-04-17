@@ -31,24 +31,25 @@ class TorchvisionDatasetWrapper:
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
-parser.add_argument("--n_neurons", type=int, default=100)
+parser.add_argument("--n_neurons", type=int, default=64)
+parser.add_argument("--batch_size", type=int, default=64)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
-parser.add_argument("--n_train", type=int, default=50000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
+parser.add_argument("--n_updates", type=int, default=80)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
-parser.add_argument("--theta_plus", type=float, default=0.05)
-parser.add_argument("--time", type=int, default=250)
+parser.add_argument("--theta_plus", type=float, default=.05)
+parser.add_argument("--time", type=int, default=100)
 parser.add_argument("--dt", type=int, default=1.0)
-parser.add_argument("--intensity", type=float, default=128*20)
+parser.add_argument("--intensity", type=float, default=128*4)
 parser.add_argument("--progress_interval", type=int, default=10)
-parser.add_argument("--update_interval", type=int, default=1000)
+parser.add_argument("--num_layers", type=int, default=2)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
-parser.add_argument("--plot", dest="plot", default=False)
+parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--batch_size", type=int, default=50)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -66,11 +67,17 @@ time = args.time
 dt = args.dt
 intensity = args.intensity
 progress_interval = args.progress_interval
-update_interval = args.update_interval
+
 train = args.train
 plot = args.plot
 gpu = args.gpu
 batch_size = args.batch_size
+num_layers = args.num_layers
+n_updates=args.n_updates
+
+update_steps = int(n_train / batch_size / n_updates)
+update_interval = update_steps * batch_size
+print(update_interval)
 
 # Sets up GPU usage
 device = torch.device("cuda" if torch.cuda.is_available() and gpu else "cpu")
@@ -120,17 +127,19 @@ VGGSmallFE.load_state_dict(torch.load('VGGSmallMNIST.pth', map_location=torch.de
 ###POISON ENCODER FOR VGGSMALL OUTPUT
 encoder = PoissonEncoder(time=time, dt=dt, intensity=intensity)
 
-# Build network
-network = DiehlAndCook2015(
-    n_inpt=128 *7 *7,  # Adjusted input size for feature extraction in VGGSmall
+from MultilayerDiehlandCook import MultiLayerDiehlAndCook2015
+network = MultiLayerDiehlAndCook2015(
+    n_inpt=128*7*7,
     n_neurons=n_neurons,
+    num_layers=num_layers,
     exc=exc,
     inh=inh,
     dt=dt,
-    norm=(128*7*7)/10,#78.4,
+    norm=128*7*7,
     theta_plus=theta_plus,
-    inpt_shape=(128,7,7),  # Adjusted input shape for CIFAR-100 images
+    inpt_shape=(128,7,7),
 )
+
 if os.path.isfile("VGGSmall-SNNAugment.pth"):
     print("=======================================\nUsing VGGSmall-SNNAugment(network).pth found on your computer\n============================")
     network.load_state_dict(torch.load('VGGSmall-SNNAugment(network).pth'))
@@ -166,15 +175,18 @@ accuracy = {"all": [], "proportion": []}
 
 # Voltage recording for excitatory and inhibitory layers
 exc_voltage_monitor = Monitor(
-    network.layers["Ae"], ["v"], time=int(time / dt), device=device
+    network.layers[f"Ae_{num_layers-1}"], ["v"], time=int(time / dt), device=device
 )
 inh_voltage_monitor = Monitor(
-    network.layers["Ai"], ["v"], time=int(time / dt), device=device
+    network.layers[f"Ae_{num_layers-2}"], ["v"], time=int(time / dt), device=device
 )
 network.add_monitor(exc_voltage_monitor, name="exc_voltage")
 network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 
 # Set up monitors for spikes and voltages
+ims = [None] * len(set(network.layers))
+axes = [None] * len(set(network.layers))
+spike_ims, spike_axes = None, None
 spikes = {}
 for layer in set(network.layers):
     spikes[layer] = Monitor(
@@ -196,7 +208,7 @@ assigns_im = None
 perf_ax = None
 voltage_axes, voltage_ims = None, None
 
-pbar_training = tqdm(total=n_train)
+
 # Train the network
 print("\nBegin training.\n")
 start = t()
@@ -213,10 +225,10 @@ for epoch in range(n_epochs):
     dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=gpu#n_workers, pin_memory=gpu
     )
+    pbar_training = tqdm(total=n_train, position=0, leave=True)
     for step, batch in enumerate(dataloader):#tqdm(dataloader)):
         if (step+1) * batch_size > n_train:
             break
-        print(batch["encoded_image"].shape)
         CNN_out = VGGSmallFE(batch["encoded_image"])
         spike_train = encoder(CNN_out)
         inputs = {"X": spike_train.view(int(time / dt), batch_size, 128,7,7).to(device)}
@@ -290,7 +302,7 @@ for epoch in range(n_epochs):
         # Get voltage recording.
         exc_voltages = exc_voltage_monitor.get("v")
         inh_voltages = inh_voltage_monitor.get("v")
-        s = spikes["Ae"].get("s").permute((1, 0, 2))
+        s = spikes[f"Ae_{num_layers-1}"].get("s").permute((1, 0, 2))
 
 
         spike_record[
@@ -310,11 +322,10 @@ for epoch in range(n_epochs):
             #     input_exc_weights.view(3072, n_neurons), n_sqrt, 32
             # )
             square_assignments = get_square_assignments(assignments, 100)
-            spikes_ = {layer: spikes[layer].get("s") for layer in spikes}
-            for key, value in spikes.items():
-                # Assuming 'value' is a torch.Tensor representing spikes
-                spikes_[key] = value.get("s")[0:n_neurons]  # Extracting spikes for the first image
-            # voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
+            spikes_ = {
+                layer: spikes[layer].get("s")[:, 0].contiguous() for layer in spikes}
+
+            voltages = {f"Ae_{num_layers-1}": exc_voltages, f"Ae_{num_layers-2}": inh_voltages}
             inpt = inpt.squeeze() 
             local_inpy = inpt.reshape(inpt.shape[0], -1)
             inpt_axes, inpt_ims = plot_input(
@@ -324,17 +335,15 @@ for epoch in range(n_epochs):
             # weights_im = plot_weights(square_weights, im=weights_im)
             assigns_im = plot_assignments(square_assignments, im=assigns_im)
             perf_ax = plot_performance(accuracy, x_scale=update_interval, ax=perf_ax)
-            # voltage_ims, voltage_axes = plot_voltages(
-            #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-            # )
+            voltage_ims, voltage_axes = plot_voltages(
+                voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+            )
 
             # plt.pause(1e-8)
-        print(labels)
         network.reset_state_variables()  # Reset state variables
-        pbar.set_description_str("Train progress: ")
-        pbar.update()
+        pbar_training.update(batch_size)
         rstep=rstep+1
-        time.sleep(10)
+        # time.sleep(10)
 
 print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
 print("Training complete.\n")

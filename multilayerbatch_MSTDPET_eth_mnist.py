@@ -23,16 +23,17 @@ from bindsnet.evaluation import all_activity, assign_labels, proportion_weightin
 from bindsnet.models import DiehlAndCook2015
 from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
+from bindsnet.learning.reward import MovingAvgRPE
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=64)
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=256)
 parser.add_argument("--n_epochs", type=int, default=1)
-parser.add_argument("--n_test", type=int, default=300)
-parser.add_argument("--n_train", type=int, default=200)
+parser.add_argument("--n_test", type=int, default=10000)
+parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
-parser.add_argument("--n_updates", type=int, default=8000)
+parser.add_argument("--n_updates", type=int, default=80)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
 parser.add_argument("--theta_plus", type=float, default=.05)
@@ -45,7 +46,6 @@ parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--n_clamp", type=int, default=1)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -69,12 +69,9 @@ train = args.train
 plot = args.plot
 gpu = args.gpu
 num_layers = args.num_layers
-n_clamp = args.n_clamp
 
-# update_steps = int(n_train / batch_size / n_updates)
-# update_interval = update_steps * batch_size
-update_steps = 20
-update_interval = 20
+update_steps = int(n_train / batch_size / n_updates)
+update_interval = update_steps * batch_size
 print(update_interval)
 
 device = "cpu"
@@ -111,8 +108,8 @@ start_intensity = intensity
 #     inpt_shape=(1, 28, 28),
 # )
 
-from MultilayerDiehlandCook import MultiLayerDiehlAndCook2015
-network = MultiLayerDiehlAndCook2015(
+from MultiLayer_MSTDPET import MultiLayerMSTDPET
+network = MultiLayerMSTDPET(
     n_inpt=784,
     n_neurons=n_neurons,
     num_layers=num_layers,
@@ -144,7 +141,6 @@ n_classes = 10
 assignments = -torch.ones(n_neurons, device=device)
 proportions = torch.zeros((n_neurons, n_classes), device=device)
 rates = torch.zeros((n_neurons, n_classes), device=device)
-per_class = int(n_neurons/n_classes)
 
 # Sequence of accuracy estimates.
 accuracy = {"all": [], "proportion": []}
@@ -294,14 +290,9 @@ for epoch in range(n_epochs):
 
         # Remember labels.
         labels.extend(batch["label"].tolist())
-        labels_now = batch["label"].tolist()
-        
-        choice = np.random.choice(int(n_neurons / n_classes), size=n_clamp, replace=False)
-        labels_tensor = torch.tensor(labels_now)
-        clamp = {f"Ae_{num_layers-1}": per_class * labels_tensor.long() + torch.Tensor(choice).long()}
 
         # Run the network on the input.
-        network.run(inputs=inputs, time=time, clamp = clamp)
+        network.run(inputs=inputs, time=time)
 
         # Add to spikes recording.
         s = spikes[f"Ae_{num_layers-2}"].get("s").permute((1, 0, 2))

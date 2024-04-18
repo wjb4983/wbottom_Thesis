@@ -52,6 +52,91 @@ class VGGSmall(nn.Module):
                 in_channels = v
         return nn.Sequential(*layers)
     
+
+class VGGSmallEx(nn.Module):
+    def __init__(self, num_classes=10, loss_chance=0.0):
+        super(VGGSmallEx, self).__init__()
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.relu3 = nn.ReLU(inplace=True)
+        self.conv4 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.relu4 = nn.ReLU(inplace=True)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.fc1 = nn.Linear(128 * 7 * 7, 4096)
+        self.relu5 = nn.ReLU(inplace=True)
+        self.dropout1 = nn.Dropout()
+        self.fc2 = nn.Linear(4096, 4096)
+        self.relu6 = nn.ReLU(inplace=True)
+        self.dropout2 = nn.Dropout()
+        self.fc3 = nn.Linear(4096, num_classes)
+        self.loss_chance=loss_chance
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.stochastic_activation(x)
+        x = self.relu1(x)
+        x = self.stochastic_activation(x)
+        x = self.conv2(x)
+        x = self.stochastic_activation(x)
+        x = self.relu2(x)
+        x = self.stochastic_activation(x)
+        x = self.maxpool1(x)
+        # x = self.stochastic_activation(x)
+        x = self.conv3(x)
+        x = self.stochastic_activation(x)
+        x = self.relu3(x)
+        x = self.stochastic_activation(x)
+        x = self.conv4(x)
+        x = self.stochastic_activation(x)
+        x = self.relu4(x)
+        x = self.stochastic_activation(x)
+        x = self.maxpool2(x)
+        # x = self.stochastic_activation(x)
+        x = torch.flatten(x, 1)
+        # x = self.stochastic_activation(x)
+        x = self.fc1(x)
+        x = self.stochastic_activation(x)
+        x = self.relu5(x)
+        x = self.stochastic_activation(x)
+        x = self.fc2(x)
+        x = self.stochastic_activation(x)
+        x = self.relu6(x)
+        x = self.stochastic_activation(x)
+        x = self.fc3(x)
+        return x
+    def stochastic_activation(self, x):
+        mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
+        return x * (~mask).float()  # Apply mask to zero out 5% of the values
+def check_accuracy(loader, model, device):
+    if loader.dataset.train:
+        print("Checking accuracy on training data")
+    else:
+        print("Checking accuracy on test data")
+
+    num_correct = 0
+    num_samples = 0
+    model.eval()
+
+    with torch.no_grad():
+        for x, y in tqdm(loader):
+            x = x.to(device=device)
+            y = y.to(device=device)
+
+            scores = model(x)
+            _, predictions = scores.max(1)
+            num_correct += (predictions == y).sum()
+            num_samples += predictions.size(0)
+
+        print(
+            f"Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}"
+        )
+
+    model.train()
+    
 if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
     
@@ -78,23 +163,10 @@ if __name__ == '__main__':
     )
     
     # Load Data
-    batch_size = 64
+    batch_size = 32
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
-    
-    # Random pick a sample to plot
-    sample = next(iter(train_loader))
-    imgs, lbls = sample
-    
-    # Plot the sample
-    plt.figure(figsize=(2,2))
-    grid = torchvision.utils.make_grid(nrow=20, tensor=imgs[1])
-    plt.imshow(np.transpose(grid, axes=(1,2,0)), cmap='gray');
-    
-    
-    
-    
     
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -105,11 +177,10 @@ if __name__ == '__main__':
     num_epochs = 2 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
     
     # Load pretrain model & you may modify it
-    model = VGGSmall(num_classes=10)
+    model = VGGSmallEx(num_classes=10)
     model.to(device)
     
     # Loss and optimizer
-    # Reference: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
@@ -134,31 +205,7 @@ if __name__ == '__main__':
         print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
     
     # Check accuracy on training & test to see how good our model
-    def check_accuracy(loader, model):
-        if loader.dataset.train:
-            print("Checking accuracy on training data")
-        else:
-            print("Checking accuracy on test data")
-    
-        num_correct = 0
-        num_samples = 0
-        model.eval()
-    
-        with torch.no_grad():
-            for x, y in tqdm(loader):
-                x = x.to(device=device)
-                y = y.to(device=device)
-    
-                scores = model(x)
-                _, predictions = scores.max(1)
-                num_correct += (predictions == y).sum()
-                num_samples += predictions.size(0)
-    
-            print(
-                f"Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}"
-            )
-    
-        model.train()
+
     
     check_accuracy(train_loader, model)
     check_accuracy(val_loader, model)

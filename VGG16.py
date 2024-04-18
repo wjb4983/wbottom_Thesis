@@ -57,11 +57,12 @@ import ssl
 # grid = torchvision.utils.make_grid(nrow=20, tensor=imgs[1])
 # plt.imshow(np.transpose(grid, axes=(1,2,0)), cmap='gray');
 
-# VGG11 according to ChatGPT
-class VGG11(nn.Module):
-    def __init__(self, num_classes=100):
-        super(VGG11, self).__init__()
-        self.features = self._make_layers([64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'])
+# VGG16 according to ChatGPT
+class VGG16(nn.Module):
+    def __init__(self, num_classes=1, in_channels=3):
+        super(VGG16, self).__init__()
+        self.features = self._make_layers([64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'], in_channels)
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
@@ -74,13 +75,13 @@ class VGG11(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
 
-    def _make_layers(self, cfg):
+    def _make_layers(self, cfg, in_channels):
         layers = []
-        in_channels = 3
         for v in cfg:
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -89,89 +90,139 @@ class VGG11(nn.Module):
                 layers += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
         return nn.Sequential(*layers)
-
-import torch
-import torch.nn as nn
-
-class VGG11Ex(nn.Module):
-    def __init__(self, num_classes=100):
-        super(VGG11Ex, self).__init__()
-        # Define convolutional layers
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.relu1 = nn.ReLU(inplace=True)
+class VGG16Ex(nn.Module):
+    def __init__(self, num_classes=1, in_channels=3, loss_chance=0.0):
+        super(VGG16Ex, self).__init__()
+        self.loss_chance = loss_chance
+        # Convolutional layers
+        self.conv1_1 = nn.Conv2d(in_channels, 64, kernel_size=3, padding=1)
+        self.relu1_1 = nn.ReLU(inplace=True)
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.relu1_2 = nn.ReLU(inplace=True)
         self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.relu2 = nn.ReLU(inplace=True)
+
+        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.relu2_1 = nn.ReLU(inplace=True)
+        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.relu2_2 = nn.ReLU(inplace=True)
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
-        
+
         self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
         self.relu3_1 = nn.ReLU(inplace=True)
         self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
         self.relu3_2 = nn.ReLU(inplace=True)
+        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.relu3_3 = nn.ReLU(inplace=True)
         self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)
-        
+
         self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
         self.relu4_1 = nn.ReLU(inplace=True)
         self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.relu4_2 = nn.ReLU(inplace=True)
+        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.relu4_3 = nn.ReLU(inplace=True)
         self.maxpool4 = nn.MaxPool2d(kernel_size=2, stride=2)
-        
+
         self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.relu5_1 = nn.ReLU(inplace=True)
         self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.relu5_2 = nn.ReLU(inplace=True)
+        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.relu5_3 = nn.ReLU(inplace=True)
         self.maxpool5 = nn.MaxPool2d(kernel_size=2, stride=2)
-        
-        # Define fully connected layers
+
+        # Adaptive average pooling layer
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+
+        # Fully connected layers
         self.fc1 = nn.Linear(512 * 7 * 7, 4096)
-        self.relu6 = nn.ReLU(True)
-        
+        self.relu6 = nn.ReLU(inplace=True)
+        # self.dropout1 = nn.Dropout()
         self.fc2 = nn.Linear(4096, 4096)
-        self.relu7 = nn.ReLU(True)
-        
+        self.relu7 = nn.ReLU(inplace=True)
+        # self.dropout2 = nn.Dropout()
         self.fc3 = nn.Linear(4096, num_classes)
 
     def forward(self, x):
-        # Apply convolutional layers
-        x = self.conv1(x)
-        x = self.relu1(x)
+        x = self.conv1_1(x)
+        x = self.stochastic_activation(x)
+        x = self.relu1_1(x)
+        x = self.stochastic_activation(x)
+        x = self.conv1_2(x)
+        x = self.stochastic_activation(x)
+        x = self.relu1_2(x)
+        x = self.stochastic_activation(x)
         x = self.maxpool1(x)
-        
-        x = self.conv2(x)
-        x = self.relu2(x)
+
+        x = self.conv2_1(x)
+        x = self.stochastic_activation(x)
+        x = self.relu2_1(x)
+        x = self.stochastic_activation(x)
+        x = self.conv2_2(x)
+        x = self.stochastic_activation(x)
+        x = self.relu2_2(x)
+        x = self.stochastic_activation(x)
         x = self.maxpool2(x)
-        
+
         x = self.conv3_1(x)
+        x = self.stochastic_activation(x)
         x = self.relu3_1(x)
+        x = self.stochastic_activation(x)
         x = self.conv3_2(x)
+        x = self.stochastic_activation(x)
         x = self.relu3_2(x)
+        x = self.stochastic_activation(x)
+        x = self.conv3_3(x)
+        x = self.stochastic_activation(x)
+        x = self.relu3_3(x)
+        x = self.stochastic_activation(x)
         x = self.maxpool3(x)
-        
+
         x = self.conv4_1(x)
+        x = self.stochastic_activation(x)
         x = self.relu4_1(x)
+        x = self.stochastic_activation(x)
         x = self.conv4_2(x)
+        x = self.stochastic_activation(x)
         x = self.relu4_2(x)
+        x = self.stochastic_activation(x)
+        x = self.conv4_3(x)
+        x = self.stochastic_activation(x)
+        x = self.relu4_3(x)
+        x = self.stochastic_activation(x)
         x = self.maxpool4(x)
-        
+
         x = self.conv5_1(x)
+        x = self.stochastic_activation(x)
         x = self.relu5_1(x)
+        x = self.stochastic_activation(x)
         x = self.conv5_2(x)
+        x = self.stochastic_activation(x)
         x = self.relu5_2(x)
+        x = self.stochastic_activation(x)
+        x = self.conv5_3(x)
+        x = self.stochastic_activation(x)
+        x = self.relu5_3(x)
+        x = self.stochastic_activation(x)
         x = self.maxpool5(x)
-        
-        # Flatten and apply fully connected layers
-        # x = x.view(x.size(0), -1)
+
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc1(x)
+        x = self.stochastic_activation(x)
         x = self.relu6(x)
-        
+        x = self.stochastic_activation(x)
         x = self.fc2(x)
+        x = self.stochastic_activation(x)
         x = self.relu7(x)
-        
+        x = self.stochastic_activation(x)
         x = self.fc3(x)
-        
+
         return x
+    def stochastic_activation(self, x):
+        mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
+        return x * (~mask).float()  # Apply mask to zero out 5% of the values
+
 
 
 # # Set device
@@ -183,7 +234,7 @@ class VGG11Ex(nn.Module):
 # num_epochs = 10 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
 
 # # Load pretrain model & you may modify it
-# model = VGG11(num_classes=100)
+# model = VGG16(in_channels=3, num_classes=100)
 # model.to(device)
 
 # # Loss and optimizer

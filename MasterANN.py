@@ -76,7 +76,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(0)
     np.random.seed(0)
     # Load Data
-    batch_size = 32
+    batch_size = 64
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
@@ -112,9 +112,8 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(num_epochs):
             losses = []
-            progress_bar = tqdm(enumerate(train_loader), total=len(train_loader))
             # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-            for batch_idx, (data, targets) in progress_bar:
+            for batch_idx, (data, targets) in tqdm(enumerate(train_loader), total=len(train_loader)):
                 data = data.to(device)
                 targets = targets.to(device)
         
@@ -126,7 +125,6 @@ if __name__ == '__main__':
                 loss.backward()
         
                 optimizer.step()
-                progress_bar.update(batch_size)
         
             print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
             check_accuracy(val_loader, model, device)

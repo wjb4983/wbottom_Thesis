@@ -35,7 +35,7 @@ parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--n_updates", type=int, default=80)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
-parser.add_argument("--theta_plus", type=float, default=1.0)
+parser.add_argument("--theta_plus", type=float, default=0.7)
 parser.add_argument("--time", type=int, default=100)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
@@ -627,7 +627,7 @@ class Custom_Connection(AbstractConnection):
         import random
         s_float = s.float()
         # print(s.shape)  # Print tensor shape for debugging
-        mask = (s_float == 1) & (torch.rand_like(s_float) < 0.3)  # Create a mask for spike modification
+        mask = (s_float == 1) & (torch.rand_like(s_float) < 0.01)  # Create a mask for spike modification
         s[mask] = 0  # Set spikes to 0 where the mask is True
         if self.b is None:
             post = s.view(s.size(0), -1).float() @ self.w
@@ -793,14 +793,14 @@ class DiehlAndCook2015_CustomConnection(Network):
             norm=norm,
         )
         w = self.exc * torch.diag(torch.ones(self.n_neurons))
-        exc_inh_conn = Custom_Connection(
+        exc_inh_conn = Connection(
             source=exc_layer, target=inh_layer, w=w, wmin=0, wmax=self.exc
         )
         w = -self.inh * (
             torch.ones(self.n_neurons, self.n_neurons)
             - torch.diag(torch.ones(self.n_neurons))
         )
-        inh_exc_conn = Custom_Connection(
+        inh_exc_conn = Connection(
             source=inh_layer, target=exc_layer, w=w, wmin=-self.inh, wmax=0
         )
 

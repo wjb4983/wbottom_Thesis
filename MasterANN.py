@@ -19,7 +19,7 @@ from ANNFC import FCNetwork
 from VGG16 import VGG16Ex
 import torchvision.models as models
 from VGG11Cifar100 import VGG11Ex
-dataset = "cifar100"
+dataset = "cifar10"
 
 
 if __name__ == '__main__':
@@ -47,7 +47,7 @@ if __name__ == '__main__':
         test_dataset = datasets.MNIST(
             root=os.path.join("..", "..","..", "data", "MNIST"), train=False, transform=my_transforms,download=True
         )
-    if(dataset == "cigar10"):
+    if(dataset == "cifar10"):
     # Download the dataset
         train_dataset = datasets.CIFAR10(
             root=os.path.join("..", "..","..", "data", "CIFAR10"), train=True, transform=my_transforms, download=True
@@ -97,8 +97,8 @@ if __name__ == '__main__':
     # models.add(model)
     
     # model.to(device)
-
-    model_o = VGG16Ex(num_classes=100)
+    from VGG11Cifar100 import VGG11
+    model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
 
     import copy
@@ -112,6 +112,7 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(num_epochs):
             losses = []
+
             # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
             for batch_idx, (data, targets) in tqdm(enumerate(train_loader), total=len(train_loader)):
                 data = data.to(device)
@@ -125,12 +126,18 @@ if __name__ == '__main__':
                 loss.backward()
         
                 optimizer.step()
+
         
             print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
             check_accuracy(val_loader, model, device)
         print("x = ", x)
         check_accuracy(train_loader, model, device)
-        check_accuracy(val_loader, model, device)
+        # check_accuracy(val_loader, model, device)
+        model.loss_chance = 0.0
+        print("x = 0.0 now")
+        check_accuracy(train_loader, model, device)
+        # check_accuracy(val_loader, model, device)
+        print("="*30)
 
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
@@ -157,12 +164,12 @@ if __name__ == '__main__':
         print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
     print("x = ", x)
     check_accuracy(train_loader, model, device)
-    check_accuracy(val_loader, model, device)
+    # check_accuracy(val_loader, model, device)
     for x in p:
         model.loss_chance = x
         print("x: ",x)
         check_accuracy(train_loader, model, device)
-        check_accuracy(val_loader, model, device)
+        # check_accuracy(val_loader, model, device)
         print("="*30)
         
     # Check accuracy on training & test to see how good our model

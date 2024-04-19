@@ -85,7 +85,7 @@ class VGGSmallEx(nn.Module):
         x = self.relu2(x)
         x = self.stochastic_activation(x)
         x = self.maxpool1(x)
-        # x = self.stochastic_activation(x)
+        
         x = self.conv3(x)
         x = self.stochastic_activation(x)
         x = self.relu3(x)
@@ -95,9 +95,8 @@ class VGGSmallEx(nn.Module):
         x = self.relu4(x)
         x = self.stochastic_activation(x)
         x = self.maxpool2(x)
-        # x = self.stochastic_activation(x)
+        
         x = torch.flatten(x, 1)
-        # x = self.stochastic_activation(x)
         x = self.fc1(x)
         x = self.stochastic_activation(x)
         x = self.relu5(x)

@@ -225,6 +225,51 @@ class VGG16Ex(nn.Module):
 
 
 
+class EncoderDecoder(nn.Module):
+    def __init__(self, num_classes, in_channels=3, loss_chance=0.0):
+        super(EncoderDecoder, self).__init__()
+        self.loss_chance=0.0
+        # Encoder layers
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=3, padding=1)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Decoder layers
+        self.deconv1 = nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1)
+        self.relu3 = nn.ReLU(inplace=True)
+        self.deconv2 = nn.ConvTranspose2d(64, in_channels, kernel_size=4, stride=2, padding=1)
+        self.sigmoid = nn.Sigmoid()
+
+        # Classifier
+        # self.classifier = nn.Linear(128 * 8 * 8, num_classes)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.stochastic_activation(x)
+        x = self.relu1(x)
+        x = self.stochastic_activation(x)
+        x = self.maxpool1(x)
+        x = self.conv2(x)
+        x = self.stochastic_activation(x)
+        x = self.relu2(x)
+        x = self.stochastic_activation(x)
+        x = self.maxpool2(x)
+
+        x = self.deconv1(x)
+        x = self.relu3(x)
+        x = self.deconv2(x)
+        # x = self.sigmoid(x)
+
+        return x
+    def stochastic_activation(self, x):
+        mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
+        return x * (~mask).float()  # Apply mask to zero out 5% of the values
+
+# Example usage
+
 # # Set device
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

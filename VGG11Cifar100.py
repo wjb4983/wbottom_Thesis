@@ -136,6 +136,7 @@ class VGG11Ex(nn.Module):
 
     def forward(self, x):
         # Apply convolutional layers
+        # x = self.stochastic_activation(x)
         x = self.conv1(x)
         x = self.stochastic_activation(x)
         x = self.relu1(x)

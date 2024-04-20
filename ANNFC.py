@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class FCNetwork(nn.Module):
-    def __init__(self, input_size, hidden_sizes, output_size, loss_chance):
+    def __init__(self, input_size, hidden_size, output_size, loss_chance, num_layers):
         super(FCNetwork, self).__init__()
-        layer_sizes = [input_size] + hidden_sizes + [output_size]
         self.fc_layers = nn.ModuleList()
-        for i in range(len(layer_sizes) - 1):
-            self.fc_layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+        self.fc_layers.append(nn.Linear(input_size, hidden_size))
+        self.fc_layers.append(nn.ReLU())
+        for i in range(num_layers):
+            self.fc_layers.append(nn.Linear(hidden_size, hidden_size))
             self.fc_layers.append(nn.ReLU())
         self.softmax = nn.Softmax(dim=1)  # Softmax along the second dimension
         self.loss_chance = loss_chance

@@ -24,14 +24,12 @@ import ssl
 class VGGSmall(nn.Module):
     def __init__(self, num_classes=10):
         super(VGGSmall, self).__init__()
-        self.features = self._make_layers([64, 64, 'M', 128, 128, 'M'])
+        self.features = self._make_layers([64, 'M', 128, 'M'])
         self.classifier = nn.Sequential(
             nn.Linear(128 * 7 * 7, 4096),
             nn.ReLU(True),
-            nn.Dropout(),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
-            nn.Dropout(),
             nn.Linear(4096, num_classes),
         )
 

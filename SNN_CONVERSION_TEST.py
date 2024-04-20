@@ -26,18 +26,18 @@ from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--seed", type=int, default=0)
+parser.add_argument("--seed", type=int, default=1)
 parser.add_argument("--n_neurons", type=int, default=64)
-parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=64)
 parser.add_argument("--n_epochs", type=int, default=1)
-parser.add_argument("--n_test", type=int, default=0)
-parser.add_argument("--n_train", type=int, default=10000)
+parser.add_argument("--n_test", type=int, default=10000)
+parser.add_argument("--n_train", type=int, default=0)
 parser.add_argument("--n_workers", type=int, default=-1)
 parser.add_argument("--n_updates", type=int, default=8000)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
 parser.add_argument("--theta_plus", type=float, default=.05)
-parser.add_argument("--time", type=int, default=100)
+parser.add_argument("--time", type=int, default=150)
 parser.add_argument("--dt", type=int, default=1.0)
 parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
@@ -46,7 +46,6 @@ parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
-parser.add_argument("--n_clamp", type=int, default=1)
 parser.set_defaults(plot=True, gpu=True)
 
 args = parser.parse_args()
@@ -70,7 +69,6 @@ train = args.train
 plot = args.plot
 gpu = args.gpu
 num_layers = args.num_layers
-n_clamp = args.n_clamp
 
 # update_steps = int(n_train / batch_size / n_updates)
 # update_interval = update_steps * batch_size
@@ -99,35 +97,22 @@ if n_workers == -1:
 n_sqrt = int(np.ceil(np.sqrt(n_neurons)))
 start_intensity = intensity
 
-# Build network.
-# network = DiehlAndCook2015(
-#     n_inpt=784,
-#     n_neurons=n_neurons,
-#     exc=exc,
-#     inh=inh,
-#     dt=dt,
-#     norm=78.4,
-#     nu=(1e-4, 1e-2),
-#     theta_plus=theta_plus,
-#     inpt_shape=(1, 28, 28),
-# )
+
 
 # from bindsnet.utils import load_network
 
 # network.load_state_dict(torch.load('snn_conversion.pth'))
-from VGGSmallMNIST import VGGSmall
+from VGGSmall_SNNConversion import VGGSmall
 network = VGGSmall(num_classes=10)
 network.load_state_dict(torch.load('presnn_conversion.pth'))
-print(network)
+# print(network)
 import torch.nn as nn
 assert isinstance(network, nn.Module)
 from bindsnet.conversion import ann_to_snn
 network = ann_to_snn(network, (1,28,28))
-# loaded_model_state = torch.load('snn_conversion.pth')
-# loaded_model = VGGSmall(num_classes=10)
-# loaded_model.load_state_dict(loaded_model_state)
-# network = loaded_model
-# network.load_state_dict('snn_conversion.pth')
+xp = network.children()
+for c in xp:
+    print(c)
 
 # Directs network to GPU
 if gpu:
@@ -154,41 +139,7 @@ per_class = int(n_neurons/n_classes)
 # Sequence of accuracy estimates.
 accuracy = {"all": [], "proportion": []}
 
-# Voltage recording for excitatory and inhibitory layers.
-# exc_voltage_monitor = Monitor(
-#     network.layers[f"Ae_{num_layers-1}"], ["v"], time=int(time / dt), device=device
-# )
-# inh_voltage_monitor = Monitor(
-#     network.layers[f"Ae_{num_layers-2}"], ["v"], time=int(time / dt), device=device
-# )
-# network.add_monitor(exc_voltage_monitor, name="exc_voltage")
-# network.add_monitor(inh_voltage_monitor, name="inh_voltage")
 
-# Set up monitors for spikes and voltages
-# spikes = {}
-# for layer in set(network.layers):
-#     spikes[layer] = Monitor(
-#         network.layers[layer], state_vars=["s"], time=int(time / dt), device=device
-#     )
-#     network.add_monitor(spikes[layer], name="%s_spikes" % layer)
-
-ims = [None] * len(set(network.layers))
-axes = [None] * len(set(network.layers))
-spike_ims, spike_axes = None, None
-spikes = {}
-for layer in set(network.layers):
-    spikes[layer] = Monitor(
-        network.layers[layer], state_vars=["s"], time=int(time / dt), device=device
-    )
-    network.add_monitor(spikes[layer], name="%s_spikes" % layer)
-
-
-voltages = {}
-for layer in set(network.layers) - {"X"}:
-    voltages[layer] = Monitor(
-        network.layers[layer], state_vars=["v"], time=int(time / dt), device=device
-    )
-    network.add_monitor(voltages[layer], name="%s_voltages" % layer)
 
 inpt_ims, inpt_axes = None, None
 spike_ims, spike_axes = None, None
@@ -201,197 +152,39 @@ spike_record = torch.zeros((batch_size, int(time / dt), n_neurons), device=devic
 
 # Train the network.
 i=0
-print(network.layers)
+last_layer = None
+layers = {}
+# print(network.layers)
 for layer_name in network.layers:
-    print(network.layers[layer_name])
-    i=i+1
-    network.layers[layer_name].name = f"layer{i}"
-    
+    print(layer_name)
+    last_layer=layer_name
 for connection in network.connections.values():
     if "MaxPool2d" not in connection.__class__.__name__:
         print(f"Connection Name: {connection.source, connection.target}")
-        print(f"Source Layer: {connection.source.__class__.__name__}")
-        print(f"Target Layer: {connection.target.__class__.__name__}")
         print(f"Weight Matrix Shape: {connection.w.shape}")
+        print(f"{connection.type}")
         print("==============================")
     else:
         print("=================\nMaxpool\n==================\n")
+        print(f"{connection.type}")
+    connection.reduction = torch.sum
+        
 
+ims = [None] * len(set(network.layers))
+axes = [None] * len(set(network.layers))
+spike_ims, spike_axes = None, None
+spikes = {}
+for layer in set(network.layers):
+    spikes[layer] = Monitor(
+        network.layers[layer], state_vars=["s"], time=int(time / dt), device=device
+    )
+    network.add_monitor(spikes[layer], name="%s_spikes" % layer)
+
+        
+        
 print("\nBegin training...")
 start = t()
 
-# for epoch in range(n_epochs):
-#     labels = []
-
-#     if epoch % progress_interval == 0:
-#         print("\nProgress: %d / %d (%.4f seconds)" % (epoch, n_epochs, t() - start))
-#         start = t()
-
-#     # Create a dataloader to iterate and batch data
-#     train_dataloader = DataLoader(
-#         dataset,
-#         batch_size=batch_size,
-#         shuffle=True,
-#         num_workers=n_workers,
-#         pin_memory=gpu,
-#     )
-
-#     pbar_training = tqdm(total=n_train)
-#     for step, batch in enumerate(train_dataloader):
-#         if step * batch_size > n_train:
-#             break
-
-#         # Assign labels to excitatory neurons.
-#         if step % update_steps == 0 and step > 0:
-#             # Convert the array of labels into a tensor
-#             label_tensor = torch.tensor(labels, device=device)
-
-#             # Get network predictions.
-#             all_activity_pred = all_activity(
-#                 spikes=spike_record, assignments=assignments, n_labels=n_classes
-#             )
-#             proportion_pred = proportion_weighting(
-#                 spikes=spike_record,
-#                 assignments=assignments,
-#                 proportions=proportions,
-#                 n_labels=n_classes,
-#             )
-
-#             # Compute network accuracy according to available classification strategies.
-#             accuracy["all"].append(
-#                 100
-#                 * torch.sum(label_tensor.long() == all_activity_pred.to(device)).item()
-#                 / len(label_tensor)
-#             )
-#             accuracy["proportion"].append(
-#                 100
-#                 * torch.sum(label_tensor.long() == proportion_pred.to(device)).item()
-#                 / len(label_tensor)
-#             )
-
-#             print(
-#                 "\nAll activity accuracy: %.2f (last), %.2f (average), %.2f (best)"
-#                 % (
-#                     accuracy["all"][-1],
-#                     np.mean(accuracy["all"]),
-#                     np.max(accuracy["all"]),
-#                 )
-#             )
-#             print(
-#                 "Proportion weighting accuracy: %.2f (last), %.2f (average), %.2f"
-#                 " (best)\n"
-#                 % (
-#                     accuracy["proportion"][-1],
-#                     np.mean(accuracy["proportion"]),
-#                     np.max(accuracy["proportion"]),
-#                 )
-#             )
-
-#             # Assign labels to excitatory layer neurons.
-#             assignments, proportions, rates = assign_labels(
-#                 spikes=spike_record,
-#                 labels=label_tensor,
-#                 n_labels=n_classes,
-#                 rates=rates,
-#             )
-
-#             labels = []
-
-#         # Get next input sample.
-#         inputs = {"X": batch["encoded_image"]}
-#         if gpu:
-#             inputs = {k: v.cuda() for k, v in inputs.items()}
-
-#         # Remember labels.
-#         labels.extend(batch["label"].tolist())
-#         labels_now = batch["label"].tolist()
-        
-#         choice = np.random.choice(int(n_neurons / n_classes), size=n_clamp, replace=False)
-#         labels_tensor = torch.tensor(labels_now)
-#         clamp = {f"Ae_{num_layers-1}": per_class * labels_tensor.long() + torch.Tensor(choice).long()}
-
-#         # Run the network on the input.
-#         network.run(inputs=inputs, time=time, clamp = clamp)
-
-#         # Add to spikes recording.
-#         s = spikes[f"Ae_{num_layers-2}"].get("s").permute((1, 0, 2))
-#         spike_record[
-#             (step * batch_size)
-#             % update_interval : (step * batch_size % update_interval)
-#             + s.size(0)
-#         ] = s
-
-#         # Get voltage recording.
-#         exc_voltages = exc_voltage_monitor.get("v")
-#         inh_voltages = inh_voltage_monitor.get("v")
-        
-#         # w1 = network.connections[(f"Ae_0", f"Ae_1")].w
-#         # w2 = network.connections[(f"Ae_0_0", f"Ae_1")].w
-#         # w3= network.connections[("X", f"Ae_0")].w
-#         # w4= network.connections[("X", f"Ae_0_0")].w
-#         # print(w1.mean().item())
-#         # print(w2.mean().item())
-#         # print(w3.mean().item())
-#         # print(w4.mean().item())
-#         # Optionally plot various simulation information.
-#         if plot:
-#             image = batch["image"][:, 0].view(28, 28)
-#             inpt = inputs["X"][:, 0].view(time, 784).sum(0).view(28, 28)
-#             lable = batch["label"][0]
-#             input_exc_weights = network.connections[("X", f"Ae_0")].w#[(F"Ae_0", f"Ae_1")].w
-#             # print(input_exc_weights)
-#             square_weights = get_square_weights(
-#                 input_exc_weights.view(784, n_neurons), n_sqrt, 28
-#             )
-#             square_assignments = get_square_assignments(assignments, n_sqrt)
-#             spikes_ = {
-#                 layer: spikes[layer].get("s")[:, 0].contiguous() for layer in spikes
-#             }
-#             # keys = list(spikes_.keys())
-#             # for i in range(0, len(keys), 3):
-#             #     # Get two consecutive layers from spikes_
-                
-#             #     layer1_key = keys[i]
-#             #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
-                
-#             #     # Get the spike data for the current layers
-#             #     layer1_spikes = spikes_[layer1_key]
-#             #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
-#             #     if(layer2_spikes == None):
-#             #         #ims[i], axes[i]
-#             #         x, y = plot_spikes(
-#             #             {layer1_key: layer1_spikes},
-#             #             ims=ims[i], axes=axes[i]
-#             #         )
-#             #     else:
-#             #         # ims[i], axes[i]
-#             #         x, y= plot_spikes(
-#             #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
-#             #             ims=ims[i], axes=axes[i]
-#             #         )
-# #################################################################################
-#             voltages = {f"Ae_{num_layers-1}": exc_voltages, f"Ae_{num_layers-2}": inh_voltages}#, f"Ai_{num_layers-1}": inh_voltages}
-#             inpt_axes, inpt_ims = plot_input(
-#                 image, inpt, label=lable, axes=inpt_axes, ims=inpt_ims
-#             )
-#             spike_ims, spike_axes= plot_spikes(spikes_, ims=spike_ims, axes=spike_axes)
-#             weights_im = plot_weights(square_weights, im=weights_im)
-#             assigns_im = plot_assignments(square_assignments, im=assigns_im)
-#             perf_ax = plot_performance(
-#                 accuracy, x_scale=update_steps * batch_size, ax=perf_ax
-#             )
-#             voltage_ims, voltage_axes = plot_voltages(
-#                 voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-#             )
-
-#             # plt.pause(1e-8)
-
-#         network.reset_state_variables()  # Reset state variables.
-#         pbar_training.update(batch_size)
-#     pbar_training.close()
-
-# print("Progress: %d / %d (%.4f seconds)" % (epoch + 1, n_epochs, t() - start))
-# print("\nTraining complete.\n")
 
 # Load MNIST data.
 test_dataset = MNIST(
@@ -409,7 +202,7 @@ test_dataset = MNIST(
 test_dataloader = DataLoader(
     test_dataset,
     batch_size=batch_size,
-    shuffle=True,
+    shuffle=False,
     num_workers=n_workers,
     pin_memory=gpu,
 )
@@ -432,12 +225,15 @@ for step, batch in enumerate(test_dataloader):
     inputs = {"X": batch["encoded_image"]}
     if gpu:
         inputs = {k: v.cuda() for k, v in inputs.items()}
-
+    for key, tensor in inputs.items():
+        non_zero_indices = (tensor != 0).nonzero(as_tuple=True)
+        num_non_zero_elements = len(non_zero_indices[0])
+        print(f"Number of non-zero elements for {key}: {num_non_zero_elements}")
     # Run the network on the input.
     network.run(inputs=inputs, time=time)
 
     # Add to spikes recording.
-    spike_record = spikes["Ae"].get("s").permute((1, 0, 2))
+    spike_record = spikes[f"{last_layer}"].get("s").permute((1, 0, 2))
 
     # Convert the array of labels into a tensor
     label_tensor = torch.tensor(batch["label"], device=device)
@@ -460,6 +256,32 @@ for step, batch in enumerate(test_dataloader):
     accuracy["proportion"] += float(
         torch.sum(label_tensor.long() == proportion_pred.to(device)).item()
     )
+    
+    spikes_ = {
+        layer: spikes[layer].get("s")[:, 0].contiguous() for layer in spikes
+    }
+    keys = list(spikes_.keys())
+    for i in range(0, len(keys), 3):
+        # Get two consecutive layers from spikes_
+        
+        layer1_key = keys[i]
+        layer2_key = keys[i + 1] if i + 1 < len(keys) else None
+        
+        # Get the spike data for the current layers
+        layer1_spikes = spikes_[layer1_key]
+        layer2_spikes = spikes_[layer2_key] if layer2_key else None
+        if(layer2_spikes == None):
+            #ims[i], axes[i]
+            x, y = plot_spikes(
+                {layer1_key: layer1_spikes},
+                ims=ims[i], axes=axes[i]
+            )
+        else:
+            # ims[i], axes[i]
+            x, y= plot_spikes(
+                {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
+                ims=ims[i], axes=axes[i]
+            )
 
     network.reset_state_variables()  # Reset state variables.
     pbar.update(batch_size)

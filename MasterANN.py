@@ -109,10 +109,10 @@ if __name__ == '__main__':
     print(model_o)
     # Train Network
     first_image = None
-    p = [0.0, 0.05, 0.95]#0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-    yes_yes = []
-    yes_no = []
-    no_yes = []
+    p = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    yes_yes = np.array([])
+    yes_no = np.array([])
+    no_yes = np.array([])
     for x in p:
         model = copy.deepcopy(model_o)
         model.loss_chance = x
@@ -125,7 +125,7 @@ if __name__ == '__main__':
             losses = []
 
             # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-            for batch_idx, (data, targets) in enumerate(train_loader): #tqdm(enumerate(train_loader), total=len(train_loader)): #
+            for batch_idx, (data, targets) in tqdm(enumerate(train_loader), total=len(train_loader)): #
                 data = data.to(device)
                 targets = targets.to(device)
         
@@ -141,8 +141,7 @@ if __name__ == '__main__':
                 optimizer.step()
 
         
-            if(epoch == num_epochs-1):# or 1==1):
-                print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
+            print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
             if(encoder == True):
         # Plot the original image
                 im = copy.deepcopy(first_image)
@@ -219,7 +218,7 @@ if __name__ == '__main__':
         losses = []
         
         # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-        for batch_idx, (data, targets) in enumerate(tqdm(train_loader)):
+        for batch_idx, (data, targets) in tqdm(enumerate(train_loader), total=len(train_loader)):
             data = data.to(device)
             targets = targets.to(device)
     
@@ -234,10 +233,10 @@ if __name__ == '__main__':
             loss.backward()
     
             optimizer.step()
-        if(epoch == num_epochs):
-            print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
+        print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
     print("x = ", 0.0)
-    check_accuracy(train_loader, model, device)
+    emp = []
+    check_accuracy(train_loader, model, device, emp)
     # check_accuracy(val_loader, model, device)
     for x in p:
         model.loss_chance = x
@@ -245,10 +244,10 @@ if __name__ == '__main__':
         no_yes = check_accuracy(train_loader, model, device, no_yes)
         # check_accuracy(val_loader, model, device)
         print("="*30)
-    arr = np.column_stack(p, yes_yes, yes_no, no_yes)
+    arr = np.column_stack((p, yes_yes, yes_no, no_yes))
     arr = arr.reshape(-1,4)
-    df = pd.DataFrame(arr, columns=[f'Column {i+1}' for i in range(4)])
-    df.to_csv(f'FC_ep:{num_epochs}_lr:{learning_rate}_ds:{dataset}_bs:{batch_size}.csv', index=False)
+    df = pd.DataFrame(arr, columns=["%", "yes_yes", "yes_no", "no_yes"])
+    df.to_csv(f'FC_ep_{num_epochs}_lr_{learning_rate}_ds_{dataset}_bs_{batch_size}.csv', index=False)
     # Check accuracy on training & test to see how good our model
 
     

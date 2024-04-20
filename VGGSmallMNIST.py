@@ -135,6 +135,7 @@ def check_accuracy(loader, model, device, arr):
         )
     arr = np.append(arr, float(num_correct)/float(num_samples))
     model.train()
+    return arr
     
 if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context

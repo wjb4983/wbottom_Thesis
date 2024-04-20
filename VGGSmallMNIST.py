@@ -110,18 +110,18 @@ class VGGSmallEx(nn.Module):
     def stochastic_activation(self, x):
         mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
         return x * (~mask).float()  # Apply mask to zero out 5% of the values
-def check_accuracy(loader, model, device):
-    if loader.dataset.train:
-        print("Checking accuracy on training data")
-    else:
-        print("Checking accuracy on test data")
+def check_accuracy(loader, model, device, arr):
+    # if loader.dataset.train:
+        # print("Checking accuracy on training data")
+    # else:
+        # print("Checking accuracy on test data")
 
     num_correct = 0
     num_samples = 0
     model.eval()
 
     with torch.no_grad():
-        for x, y in tqdm(loader):
+        for x, y in loader:
             x = x.to(device=device)
             y = y.to(device=device)
 
@@ -133,7 +133,7 @@ def check_accuracy(loader, model, device):
         print(
             f"Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}"
         )
-
+    arr = np.append(arr, float(num_correct)/float(num_samples))
     model.train()
     
 if __name__ == '__main__':

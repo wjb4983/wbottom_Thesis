@@ -19,7 +19,8 @@ from ANNFC import FCNetwork
 from VGG16 import VGG16Ex, EncoderDecoder
 import torchvision.models as models
 from VGG11Cifar100 import VGG11Ex
-dataset = "cifar100"
+import pandas as pd
+dataset = "mnist"
 encoder = False
 
 
@@ -77,7 +78,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(0)
     np.random.seed(0)
     # Load Data
-    batch_size = 128
+    batch_size = 64
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 1e-5
+    learning_rate = 1e-4
     num_epochs = 5
     
     
@@ -94,20 +95,24 @@ if __name__ == '__main__':
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    # model_o = FCNetwork(3*32*32, [500, 500, 500, 500, 500], 10, 0.0) 
+    model_o = FCNetwork(1*28*28, 200, 10, 0.0, 1) 
     # models.add(model)
     
     # model.to(device)
 
-    model_o = VGG16Ex(num_classes=100)
+    # model_o = VGG16Ex(num_classes=100)
     # model_o = EncoderDecoder(num_classes=10)
     # model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
 
     import copy
+    print(model_o)
     # Train Network
     first_image = None
-    p = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    p = [0.0, 0.05, 0.95]#0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    yes_yes = []
+    yes_no = []
+    no_yes = []
     for x in p:
         model = copy.deepcopy(model_o)
         model.loss_chance = x
@@ -120,7 +125,7 @@ if __name__ == '__main__':
             losses = []
 
             # reference : https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
-            for batch_idx, (data, targets) in enumerate(train_loader):#, total=len(train_loader):
+            for batch_idx, (data, targets) in enumerate(train_loader): #tqdm(enumerate(train_loader), total=len(train_loader)): #
                 data = data.to(device)
                 targets = targets.to(device)
         
@@ -133,17 +138,10 @@ if __name__ == '__main__':
                 losses.append(loss.item())
                 optimizer.zero_grad()
                 loss.backward()
-                # plt.figure(figsize=(4,4))
-                # x = outputs.detach().cpu().numpy()
-                # # print(x[0])
-                # plt.imshow(np.transpose(x[0]/255, (1, 2, 0)))
-                # plt.title('Reconstructed Image')
-                # plt.axis('off')
-        
                 optimizer.step()
 
         
-            if(epoch == num_epochs-1):
+            if(epoch == num_epochs-1):# or 1==1):
                 print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
             if(encoder == True):
         # Plot the original image
@@ -171,11 +169,11 @@ if __name__ == '__main__':
                 # check_accuracy(val_loader, model, device)
         print("x = ", x, "testing perf where train=true test=true")
         if(encoder == False):
-            check_accuracy(train_loader, model, device)
+            yes_yes = check_accuracy(train_loader, model, device, yes_yes)
             # check_accuracy(val_loader, model, device)
             model.loss_chance = 0.0
             print("x = 0.0 now - testing performance with train=true test=false")
-            check_accuracy(train_loader, model, device)
+            yes_no = check_accuracy(train_loader, model, device, yes_no)
             # check_accuracy(val_loader, model, device)
         else:
             im = copy.deepcopy(first_image)
@@ -208,7 +206,7 @@ if __name__ == '__main__':
             plt.axis('off')
             plt.show()
 
-        print("="*30)
+        # print("="*30)
 
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
@@ -244,10 +242,13 @@ if __name__ == '__main__':
     for x in p:
         model.loss_chance = x
         print("x: ",x)
-        check_accuracy(train_loader, model, device)
+        no_yes = check_accuracy(train_loader, model, device, no_yes)
         # check_accuracy(val_loader, model, device)
         print("="*30)
-        
+    arr = np.column_stack(p, yes_yes, yes_no, no_yes)
+    arr = arr.reshape(-1,4)
+    df = pd.DataFrame(arr, columns=[f'Column {i+1}' for i in range(4)])
+    df.to_csv(f'FC_ep:{num_epochs}_lr:{learning_rate}_ds:{dataset}_bs:{batch_size}.csv', index=False)
     # Check accuracy on training & test to see how good our model
 
     

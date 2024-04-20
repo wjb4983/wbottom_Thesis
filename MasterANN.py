@@ -25,7 +25,9 @@ encoder = False
 
 if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.cuda.manual_seed_all(0)
+    np.random.seed(0)
     # Transforms
     parser = argparse.ArgumentParser()
     parser.add_argument("--intensity", type=float, default=128)#Change???
@@ -71,22 +73,21 @@ if __name__ == '__main__':
         test_dataset = datasets.CIFAR100(
             root=os.path.join("..", "..","..", "data", "CIFAR100"), train=False, transform=my_transforms,download=True
         )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # if device=="gpu" and torch.cuda.is_available():
         # torch.cuda.manual_seed_all(0)
-    torch.cuda.manual_seed_all(0)
-    np.random.seed(0)
+
     # Load Data
-    batch_size = 128
+    batch_size = 64
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
     
     # Set device
 
     
     # Hyperparameters
-    learning_rate = 1e-5
+    learning_rate = 1.5e-4
     num_epochs = 5
     
     
@@ -143,7 +144,7 @@ if __name__ == '__main__':
                 optimizer.step()
 
         
-            if(epoch == num_epochs-1):
+            if(epoch == num_epochs-1 or 1==1):
                 print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
             if(encoder == True):
         # Plot the original image
@@ -166,9 +167,9 @@ if __name__ == '__main__':
                 plt.axis('off')
         
                 plt.show()
-            # else:
+            else:
                 
-                # check_accuracy(val_loader, model, device)
+                check_accuracy(val_loader, model, device)
         print("x = ", x, "testing perf where train=true test=true")
         if(encoder == False):
             check_accuracy(train_loader, model, device)
@@ -236,7 +237,7 @@ if __name__ == '__main__':
             loss.backward()
     
             optimizer.step()
-        if(epoch == num_epochs):
+        if(epoch == num_epochs or 1==1):
             print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
     print("x = ", 0.0)
     check_accuracy(train_loader, model, device)

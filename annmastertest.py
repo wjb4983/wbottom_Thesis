@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 4e-6
+    learning_rate = 1e-8
     num_epochs = 5
     
     
@@ -111,13 +111,12 @@ if __name__ == '__main__':
     print(model_o)
     # Train Network
     first_image = None
-    p = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    # p = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     yes_yes = np.array([])
     yes_no = np.array([])
     no_yes = np.array([])
-    for x in p:
+    while learning_rate < 1e-2:
         model = copy.deepcopy(model_o)
-        model.loss_chance = x
         model.to(device)
         criterion = nn.CrossEntropyLoss()
         if(encoder == True):
@@ -168,47 +167,7 @@ if __name__ == '__main__':
             else:
                 empty = []
                 check_accuracy(val_loader, model, device, empty)
-        print("x = ", x, "testing perf where train=true test=true")
-        if(encoder == False):
-            yes_yes = check_accuracy(train_loader, model, device, yes_yes)
-            # check_accuracy(val_loader, model, device)
-            model.loss_chance = 0.0
-            print("x = 0.0 now - testing performance with train=true test=false")
-            yes_no = check_accuracy(train_loader, model, device, yes_no)
-            # check_accuracy(val_loader, model, device)
-        else:
-            im = copy.deepcopy(first_image)
-            plt.figure(figsize=(12, 4))
-            plt.subplot(1, 3, 1)
-            plt.imshow(np.transpose(first_image/255, (1, 2, 0)))
-            plt.title('Original Image')
-            plt.axis('off')
-    
-            # Pass the image through the encoder
-            im1 = model(im.unsqueeze(0).to(device))
-            im1 = im1.squeeze(0).cpu().detach()
-    
-            # Plot the reconstructed image
-            plt.subplot(1, 3, 2)
-            plt.imshow(np.transpose(im1/255, (1, 2, 0)))
-            plt.title(f'Reconstructed Image_{x}')
-            plt.axis('off')
-    
-            
-            model.loss_chance = 0.0
-            print("x = 0.0 now - testing performance with train=true test=false")
-            im1 = model(im.unsqueeze(0).to(device))
-            im1 = im1.squeeze(0).cpu().detach()
-    
-            # Plot the reconstructed image
-            plt.subplot(1, 3, 3)
-            plt.imshow(np.transpose(im1/255, (1, 2, 0)))
-            plt.title('Reconstructed Image_0.0')
-            plt.axis('off')
-            plt.show()
-
-        # print("="*30)
-
+        learning_rate = learning_rate*4
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
     model.to(device)

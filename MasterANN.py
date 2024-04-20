@@ -28,6 +28,7 @@ if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.cuda.manual_seed_all(0)
+    torch.manual_seed(0)
     np.random.seed(0)
     # Transforms
     parser = argparse.ArgumentParser()
@@ -165,8 +166,8 @@ if __name__ == '__main__':
         
                 plt.show()
             else:
-                
-                check_accuracy(val_loader, model, device)
+                empty = []
+                check_accuracy(val_loader, model, device, empty)
         print("x = ", x, "testing perf where train=true test=true")
         if(encoder == False):
             yes_yes = check_accuracy(train_loader, model, device, yes_yes)

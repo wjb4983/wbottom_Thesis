@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 4e-6
+    learning_rate = 0.00016384
     num_epochs = 5
     
     
@@ -97,14 +97,14 @@ if __name__ == '__main__':
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
+    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
     # models.add(model)
     
     # model.to(device)
 
     # model_o = VGG16Ex(num_classes=100)
     # model_o = EncoderDecoder(num_classes=10)
-    # model_o = VGG11Ex(num_classes=10)
+    model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
 
     import copy

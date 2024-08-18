@@ -20,7 +20,7 @@ from VGG16 import VGG16Ex, EncoderDecoder
 import torchvision.models as models
 from VGG11Cifar100 import VGG11Ex
 import pandas as pd
-dataset = "cifar10"
+dataset = "cifar100"
 encoder = False
 
 
@@ -89,20 +89,20 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 1e-8
-    num_epochs = 5
+    learning_rate = 4e-5
+    num_epochs = 20
     
     
     #create model array
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
+    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 3) 
     # models.add(model)
     
     # model.to(device)
 
-    # model_o = VGG16Ex(num_classes=100)
+    model_o = VGG16Ex(num_classes=100)
     # model_o = EncoderDecoder(num_classes=10)
     # model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
@@ -116,6 +116,7 @@ if __name__ == '__main__':
     yes_no = np.array([])
     no_yes = np.array([])
     while learning_rate < 1e-2:
+        print("learning rate = ", learning_rate)
         model = copy.deepcopy(model_o)
         model.to(device)
         criterion = nn.CrossEntropyLoss()
@@ -167,7 +168,10 @@ if __name__ == '__main__':
             else:
                 empty = []
                 check_accuracy(val_loader, model, device, empty)
+            if(epoch %10 == 0):
+                learning_rate = learning_rate/2
         learning_rate = learning_rate*4
+        print("="*30)
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
     model.to(device)

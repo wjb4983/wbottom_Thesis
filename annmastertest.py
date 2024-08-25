@@ -91,15 +91,15 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 7e-5 #9.4E-5 = 20% 5 EPOCH
-    num_epochs = 50
+    learning_rate = 4e-5
+    num_epochs = 20
     
     
     #create model array
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
+    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 3) 
     # models.add(model)
     
     # model.to(device)
@@ -117,8 +117,8 @@ if __name__ == '__main__':
     yes_yes = np.array([])
     yes_no = np.array([])
     no_yes = np.array([])
-    while learning_rate < 1e-3:
-        print(learning_rate)
+    while learning_rate < 1e-2:
+        print("learning rate = ", learning_rate)
         model = copy.deepcopy(model_o)
         model.to(device)
         criterion = nn.CrossEntropyLoss()
@@ -170,7 +170,14 @@ if __name__ == '__main__':
             else:
                 empty = []
                 check_accuracy(val_loader, model, device, empty)
+<<<<<<< HEAD
         learning_rate = learning_rate+2e-4
+=======
+            if(epoch %10 == 0):
+                learning_rate = learning_rate/2
+        learning_rate = learning_rate*4
+        print("="*30)
+>>>>>>> 2b56637997c9c94d92d1cbc85cb7c915386849e8
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
     model.to(device)

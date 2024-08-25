@@ -110,8 +110,9 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 9.4e-5
-    num_epochs = 10
+
+    learning_rate = 0.00016384
+    num_epochs = 5
     
     
     #create model array
@@ -124,8 +125,8 @@ if __name__ == '__main__':
     # model.to(device)
 
     # model_o = VGG16Ex(num_classes=100)
-    model_o = EncoderDecoder(num_classes=10)
-    # model_o = VGG11Ex(num_classes=10)
+    # model_o = EncoderDecoder(num_classes=10)
+    model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
 
     import copy

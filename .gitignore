@@ -1,2 +1,5 @@
 __pycache__
 *.pth
+data
+cifar100_test
+cifar-100-python

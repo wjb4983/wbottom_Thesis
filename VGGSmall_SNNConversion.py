@@ -24,13 +24,13 @@ import ssl
 class VGGSmall(nn.Module):
     def __init__(self, num_classes=10):
         super(VGGSmall, self).__init__()
-        self.features = self._make_layers([64, 'M', 128, 'M'])
+        self.features = self._make_layers([8, 16])#, 128, 'M'])
         self.classifier = nn.Sequential(
-            nn.Linear(128 * 7 * 7, 4096),
-            nn.ReLU(True),
-            nn.Linear(4096, 4096),
-            nn.ReLU(True),
-            nn.Linear(4096, num_classes),
+            nn.Linear(64, num_classes, bias=False),
+            # nn.ReLU(True),
+            # nn.Linear(100, num_classes, bias=False),
+            # nn.ReLU(True),
+            # nn.Linear(4096, num_classes, bias=False),
         )
 
     def forward(self, x):
@@ -46,10 +46,29 @@ class VGGSmall(nn.Module):
             if v == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
             else:
-                conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+                conv2d = nn.Conv2d(in_channels, v, kernel_size=4, padding=1, stride = 4)
                 layers += [conv2d, nn.ReLU(inplace=True)]
                 in_channels = v
         return nn.Sequential(*layers)
+    
+    
+# def normalize_weights(model, last=False):
+#     with torch.no_grad():
+#         for param in model.parameters():
+            
+        # for param in model.parameters():
+            # norm = param.norm(2)
+            # if norm != 0:
+            #     param.data = param.data / norm
+        # if last:
+        #     for layer in model.children():
+        #         for layerr in layer.children():
+        #             if isinstance(layerr, nn.Conv2d):
+        #                 layerr.weight.data /= 5
+        #             if isinstance(layerr, nn.Linear):
+        #                 print(layerr.weight.data.shape)
+        #                 # if layerr.weight.data.shape == torch.Size([10, 100]):
+        #                 layerr.weight.data *=3
     
 if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -78,7 +97,7 @@ if __name__ == '__main__':
     
     # Load Data
     batch_size = 32
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)#, generator=torch.Generator(device="cuda"))
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
     
@@ -101,7 +120,7 @@ if __name__ == '__main__':
     # Hyperparameters
     learning_rate = 1e-4
     batch_size = 32
-    num_epochs = 1 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
+    num_epochs = 10 # You may change number of epochs here. 10 epochs may take up to 10 minutes for training.
     
     # Load pretrain model & you may modify it
     model = VGGSmall(num_classes=10)
@@ -111,6 +130,8 @@ if __name__ == '__main__':
     # Reference: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    
+    print(model)
     
     # Train Network
     for epoch in range(num_epochs):
@@ -122,6 +143,7 @@ if __name__ == '__main__':
             targets = targets.to(device)
     
             outputs = model(data)
+            # pred = output.data.max(1)[1]
             loss = criterion(outputs, targets)
     
             losses.append(loss.item())
@@ -129,6 +151,10 @@ if __name__ == '__main__':
             loss.backward()
     
             optimizer.step()
+            # normalize_weights(model)
+            for layer in model.children():
+                if hasattr(layer, 'bias') and layer.bias is not None:
+                    layer.bias.data.zero_()
     
         print(f"Loss at epoch {epoch + 1} is {sum(losses)/len(losses):.5f}\n")
     
@@ -164,5 +190,10 @@ if __name__ == '__main__':
     model.to("cpu")
     # snn = ann_to_snn(model, (1,28,28))
     # print(snn)
+    # normalize_weights(model, True)
+    for layer in model.children():
+        if hasattr(layer, 'bias') and layer.bias is not None:
+            layer.bias.data.zero_()
+            print(layer.bias())
     torch.save(model.state_dict(), 'presnn_conversion.pth')
     

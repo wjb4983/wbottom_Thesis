@@ -14,6 +14,7 @@ batch_size=255
 num_hidden=512
 max_energy=2
 verbose=0
+plot=0
 
 
 from bindsnet.analysis.plotting import (
@@ -132,7 +133,7 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         self.refrac_count = torch.zeros_like(self.v, device=device)
 
 class ANVN_SRIFNodes(SubtractiveResetIFNodes):
-    def __init__(self, *args, spike_limit=1000, device = 'cuda', batch_size=batch_size, **kwargs):
+    def __init__(self, *args, spike_limit=9999999, device = 'cuda', batch_size=batch_size, **kwargs):
 
         super().__init__(*args, **kwargs)
         self.batch_size = batch_size
@@ -475,10 +476,12 @@ print('Converting ANN to SNN...')
 
 data=None
 from bindsnet.network.nodes import LIFNodes
-SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=LIFNodes, tc_decay=100)# node_type=ANVN_SRIFNodes)
-SNN.connections['2','3'].w *=10
+SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=LIFNodes, tc_decay=20.0)# node_type=ANVN_SRIFNodes)
+SNN.connections['0','1'].w *=5
+SNN.connections['2','3'].w *=100
 SNN.layers['1'].refrac=torch.tensor(5)
 SNN.layers['3'].refrac=torch.tensor(5)
+SNN.layers['3'].tc_decay=torch.tensor(0)
 
 print(SNN)
 
@@ -622,7 +625,7 @@ for energy in energies:
     plt.figure()
     counts, bins = np.histogram(tree_output, 30)
     plt.stairs(counts, bins)
-    # SNN_copy.layers['1'].thresh = SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)
+    SNN_copy.layers['1'].thresh = SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)
     # print( SNN_copy.layers['1'].thresh)
     for conn in set(SNN_copy.connections.values()):
         alg_pos += torch.sum(conn.w[conn.w>0])
@@ -666,34 +669,34 @@ for energy in energies:
         # }
         
         
-        
-        keys = list(s.keys())
-        s = {layer: s[layer][:,0,:] for layer in keys}
-        for i in range(0, len(keys), 2):
-            # Get two consecutive layers from spikes_
-            
-            layer1_key = keys[i]
-            layer2_key = keys[i + 1] if i + 1 < len(keys) else None
-            
-            # Get the spike data for the current layers
-            layer1_spikes = s[layer1_key]
-            layer2_spikes = s[layer2_key] if layer2_key else None
-            if(layer2_spikes == None):
-                ims[i], axes[i] = plot_spikes(
-                    {layer1_key: layer1_spikes},
-                    ims=ims[i], axes=axes[i]
-                )
-            else:
-                ims[i], axes[i] = plot_spikes(
-                    {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
-                    ims=ims[i], axes=axes[i]
-                )
-            for ax in axes[i]:
-                ax.xaxis.set_major_locator(MultipleLocator(20))
-                ax.set_xlim(0,time)
-        voltage_ims, voltage_axes = plot_voltages(
-            voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-        )
+        if plot:
+            keys = list(s.keys())
+            s = {layer: s[layer][:,0,:] for layer in keys}
+            for i in range(0, len(keys), 2):
+                # Get two consecutive layers from spikes_
+                
+                layer1_key = keys[i]
+                layer2_key = keys[i + 1] if i + 1 < len(keys) else None
+                
+                # Get the spike data for the current layers
+                layer1_spikes = s[layer1_key]
+                layer2_spikes = s[layer2_key] if layer2_key else None
+                if(layer2_spikes == None):
+                    ims[i], axes[i] = plot_spikes(
+                        {layer1_key: layer1_spikes},
+                        ims=ims[i], axes=axes[i]
+                    )
+                else:
+                    ims[i], axes[i] = plot_spikes(
+                        {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
+                        ims=ims[i], axes=axes[i]
+                    )
+                for ax in axes[i]:
+                    ax.xaxis.set_major_locator(MultipleLocator(20))
+                    ax.set_xlim(0,time)
+            voltage_ims, voltage_axes = plot_voltages(
+                voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+            )
         SNN_copy.reset_state_variables()
     print("energy:", energy)
     # SNN_accuracy = 100.0 * float(correct) / float(num_data)

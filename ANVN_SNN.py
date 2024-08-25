@@ -622,7 +622,7 @@ def validate():
     ANN_accuracy = 100. * correct.to(torch.float32) / len(train_loader2.dataset)
 
     print("ANN accuracy:", ANN_accuracy)
-print(SNN.connections["0","1"].w.shape)
+# print(SNN.connections["0","1"].w.shape)
 validate()
 num_data = 0
 
@@ -725,7 +725,7 @@ else:
         # )
         SNN.reset_state_variables()
     torch.save(neuron_spikes, "hidden_spikes_256.pt")
-print(neuron_spikes)
+# print(neuron_spikes)
 
 import numpy as np
 import copy
@@ -733,6 +733,10 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 SNN.to('cpu')
 print("Net spikes: ", net_spikes)
+if num_data>0:
+    SNN_accuracy = 100.0 * float(correct) / float(num_data)
+    
+    print("accuracy reduced spikes: ", SNN_accuracy)
 
 print("ANVN")
 print("="*30)
@@ -754,123 +758,127 @@ neuron_spikes = (neuron_spikes-np.min(neuron_spikes))/(np.max(neuron_spikes) - n
 # print("Tree output values:", tree_output)
 
 # print("grad:",(neuron_spikes)-tree_output)
-energies = [x for x in range(125,25,-25)]
+energies = [x for x in range(250,-1,-25)]
 start=1
-for energy in energies:
-    start-=1
-
-    SNN_copy = deepcopy(SNN)
-    SNN_copy.to("cuda")
-    alg_pos = 0
-    alg_neg = 0
-    alg_mag = 0
+multipliers = [1,2,4,6,8,10]
+for multiplier in multipliers:
+    print("0"*30,"\n\n","0"*30)
+    print("multiplier: ", multiplier)
+    for energy in energies:
+        start-=1
     
-    # df = pd.DataFrame({"ANN accuracy":[ANN_accuracy],
-    #                    "SNN accuracy": [SNN_accuracy]})
-    # ciu = ciu / (max(ciu)*0.9)
-    correct2=0
-    num_data2 = 0
-    net_spikes2 = 0
-    ANVN_N = ANVN(4,energy)
-    # print(energy)
-    for e in range(500):
-        tree_output = ANVN_N.root.forward()#neuron_spikes.sum())#WE IGNORE RETURN FOR NOW
-        # tree_output = np.maximum(0, tree_output)
-        # tree_output = np.minimum(2,tree_output)
-        ANVN_N.root.backprop(neuron_spikes)
-        # print("ave grad:",np.sum(np.abs(neuron_spikes-(1-tree_output)))/num_hidden)
-    print(ANVN_N.root.energy)
-    # print("checksum: ", ANVN_N.root.checksum())
-    # print( SNN_copy.layers['1'].thresh)
-    # print(np.sum(tree_output))
-    # - 1*2 = 2
-    # 2 - [0,1] = range between 2 and 1
-    multiplier = np.max(tree_output)+1
-    if start==0:
+        SNN_copy = deepcopy(SNN)
+        SNN_copy.to("cuda")
+        alg_pos = 0
+        alg_neg = 0
+        alg_mag = 0
+        
+        # df = pd.DataFrame({"ANN accuracy":[ANN_accuracy],
+        #                    "SNN accuracy": [SNN_accuracy]})
+        # ciu = ciu / (max(ciu)*0.9)
+        correct2=0
+        num_data2 = 0
+        net_spikes2 = 0
+        ANVN_N = ANVN(2,energy)
+        # print(energy)
+        for e in range(500):
+            tree_output = ANVN_N.root.forward()
+            # tree_output = np.maximum(0, tree_output)
+            # tree_output = np.minimum(2,tree_output)
+            ANVN_N.root.backprop(neuron_spikes)
+            # print("ave grad:",np.sum(np.abs(neuron_spikes-(1-tree_output)))/num_hidden)
+        print(ANVN_N.root.energy)
+        # print("checksum: ", ANVN_N.root.checksum())
+        # print( SNN_copy.layers['1'].thresh)
+        # print(np.sum(tree_output))
+        # - 1*2 = 2
+        # 2 - [0,1] = range between 2 and 1
+        # multiplier = np.max(tree_output)+1
+        # if start==0:
         maxx = multiplier
-        print(maxx)
-    greater_mask = tree_output>maxx
-    tree_output[greater_mask] = maxx
-    SNN_copy.layers['1'].thresh = SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)
-    # print( SNN_copy.layers['1'].thresh)
-    for conn in set(SNN_copy.connections.values()):
-        alg_pos += torch.sum(conn.w[conn.w>0])
-        alg_neg += torch.sum(conn.w[conn.w<0])
-        alg_mag += torch.sum(torch.abs(conn.w))
-    for index, (data, target) in enumerate(train_loader2):
-        # if index > 100:
-        #     break
-        num_data2 +=batch_size
-        # print('sample ', index+1, 'elapsed', t_() - start)
-        start = t_()
-    
-        data = data.to(device)
-        data = data.view(-1, 3*32*32)
-        inpts = {'Input': data.repeat(time,1, 1)}
-        # print(inpts["Input"].shape)
-        SNN_copy.run(inputs=inpts, time=time)
-        s = {layer: SNN_copy.monitors[f'{layer}_spikes'].get('s') for layer in SNN_copy.layers}
-        voltages = {layer: SNN_copy.monitors[layer].get('v') for layer in ['2'] if not layer == 'Input'}
-        # pred = torch.argmax(voltages['2'].sum(1))
-        # summed_voltages = voltages['2'].sum(0)
-        summed_spikes=s['2'].sum(0)
-        net_spikes2 += summed_spikes.sum() + s['1'].sum()
-        # pred = torch.argmax(summed_voltages, dim=1).to(device)
-        pred = torch.argmax(summed_spikes, dim=1).to(device)
-        # print(pred, target)
-        # correct += pred.eq(target.data.to(device)).cpu().sum()
-        correct2 += pred.eq(target).sum().item()
-        # print(correct2)
-        # accuracy = 100.0 * float(correct) / (index + 1)
-        # print(correct)
-        # if index == 0:
-        #     ciu = calculate_intermediate_usefulness(s['1'], SNN_copy.connections["1","2"].w, target[0], time)
-        # else:
-        #     ciu += calculate_intermediate_usefulness(s['1'], SNN_copy.connections["1","2"].w, target[0], time)
-        # spikes_ = {
-        #     layer: spikes[layer].get("s")[:].contiguous() for layer in spikes
-        # }
-        # spikes_ = {
-        #     layer: spikes2[layer].get("s")[:, 0].contiguous() for layer in spikes2
-        # }
-        # keys = list(spikes_.keys())
-        # for i in range(0, len(keys), 2):
-        #     # Get two consecutive layers from spikes_
-            
-        #     layer1_key = keys[i]
-        #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
-            
-        #     # Get the spike data for the current layers
-        #     layer1_spikes = spikes_[layer1_key]
-        #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
-        #     if(layer2_spikes == None):
-        #         ims[i], axes[i] = plot_spikes(
-        #             {layer1_key: layer1_spikes},
-        #             ims=ims[i], axes=axes[i]
-        #         )
-        #     else:
-        #         ims[i], axes[i] = plot_spikes(
-        #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
-        #             ims=ims[i], axes=axes[i]
-        #         )
-        #     for ax in axes[i]:
-        #         ax.xaxis.set_major_locator(MultipleLocator(20))
-        #         ax.set_xlim(0,time)
-        # voltage_ims, voltage_axes = plot_voltages(
-        #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-        # )
-        SNN_copy.reset_state_variables()
-    print("energy:", energy)
-    # SNN_accuracy = 100.0 * float(correct) / float(num_data)
-    # print(correct, num_data)
-    # print(correct2, num_data2)
-    SNN_accuracy2 = 100.0 * float(correct2) / float(10000)
-    
-    print("accuracy reduced spikes: ", SNN_accuracy2)
-    print("net_spikes reduced spikes: ", net_spikes2)
-    print("net_spikes reduced spikes #im adjusted: ", net_spikes2/num_data2)
-    # df.to_csv(f"accuracy_{lam}.csv")
-    # print(f"baseline weights pos: {baseline_pos} neg: {baseline_neg} mag {baseline_mag}")
-    # print(f"algo weights pos: {alg_pos} neg: {alg_neg} mag {alg_mag}")
-    print("="*30)
-    del SNN_copy
+            # print(maxx)
+        greater_mask = tree_output>maxx
+        tree_output[greater_mask] = maxx
+        SNN_copy.layers['1'].thresh = SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)
+        # print( SNN_copy.layers['1'].thresh)
+        for conn in set(SNN_copy.connections.values()):
+            alg_pos += torch.sum(conn.w[conn.w>0])
+            alg_neg += torch.sum(conn.w[conn.w<0])
+            alg_mag += torch.sum(torch.abs(conn.w))
+        for index, (data, target) in enumerate(train_loader2):
+            # if index > 100:
+            #     break
+            num_data2 +=batch_size
+            # print('sample ', index+1, 'elapsed', t_() - start)
+            start = t_()
+        
+            data = data.to(device)
+            data = data.view(-1, 3*32*32)
+            inpts = {'Input': data.repeat(time,1, 1)}
+            # print(inpts["Input"].shape)
+            SNN_copy.run(inputs=inpts, time=time)
+            s = {layer: SNN_copy.monitors[f'{layer}_spikes'].get('s') for layer in SNN_copy.layers}
+            voltages = {layer: SNN_copy.monitors[layer].get('v') for layer in ['2'] if not layer == 'Input'}
+            # pred = torch.argmax(voltages['2'].sum(1))
+            # summed_voltages = voltages['2'].sum(0)
+            summed_spikes=s['2'].sum(0)
+            net_spikes2 += summed_spikes.sum() + s['1'].sum()
+            # pred = torch.argmax(summed_voltages, dim=1).to(device)
+            pred = torch.argmax(summed_spikes, dim=1).to(device)
+            # print(pred, target)
+            # correct += pred.eq(target.data.to(device)).cpu().sum()
+            correct2 += pred.eq(target).sum().item()
+            # print(correct2)
+            # accuracy = 100.0 * float(correct) / (index + 1)
+            # print(correct)
+            # if index == 0:
+            #     ciu = calculate_intermediate_usefulness(s['1'], SNN_copy.connections["1","2"].w, target[0], time)
+            # else:
+            #     ciu += calculate_intermediate_usefulness(s['1'], SNN_copy.connections["1","2"].w, target[0], time)
+            # spikes_ = {
+            #     layer: spikes[layer].get("s")[:].contiguous() for layer in spikes
+            # }
+            # spikes_ = {
+            #     layer: spikes2[layer].get("s")[:, 0].contiguous() for layer in spikes2
+            # }
+            # keys = list(spikes_.keys())
+            # for i in range(0, len(keys), 2):
+            #     # Get two consecutive layers from spikes_
+                
+            #     layer1_key = keys[i]
+            #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
+                
+            #     # Get the spike data for the current layers
+            #     layer1_spikes = spikes_[layer1_key]
+            #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
+            #     if(layer2_spikes == None):
+            #         ims[i], axes[i] = plot_spikes(
+            #             {layer1_key: layer1_spikes},
+            #             ims=ims[i], axes=axes[i]
+            #         )
+            #     else:
+            #         ims[i], axes[i] = plot_spikes(
+            #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
+            #             ims=ims[i], axes=axes[i]
+            #         )
+            #     for ax in axes[i]:
+            #         ax.xaxis.set_major_locator(MultipleLocator(20))
+            #         ax.set_xlim(0,time)
+            # voltage_ims, voltage_axes = plot_voltages(
+            #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+            # )
+            SNN_copy.reset_state_variables()
+        print("energy:", energy)
+        # SNN_accuracy = 100.0 * float(correct) / float(num_data)
+        # print(correct, num_data)
+        # print(correct2, num_data2)
+        SNN_accuracy2 = 100.0 * float(correct2) / float(10000)
+        
+        print("accuracy reduced spikes: ", SNN_accuracy2)
+        print("net_spikes reduced spikes: ", net_spikes2)
+        print("net_spikes reduced spikes #im adjusted: ", net_spikes2/num_data2)
+        # df.to_csv(f"accuracy_{lam}.csv")
+        # print(f"baseline weights pos: {baseline_pos} neg: {baseline_neg} mag {baseline_mag}")
+        # print(f"algo weights pos: {alg_pos} neg: {alg_neg} mag {alg_mag}")
+        print("="*30)
+        del SNN_copy

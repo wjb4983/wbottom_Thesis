@@ -23,6 +23,6 @@ class FCNetwork(nn.Module):
         x = self.softmax(x)
         return x
 
-    def stochastic_activation(self, x):
+    def stochastic_failure(self, x):
         mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
         return x * (~mask).float()  # Apply mask to zero out 5% of the values

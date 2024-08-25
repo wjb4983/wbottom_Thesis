@@ -145,63 +145,50 @@ class VGG16Ex(nn.Module):
 
     def forward(self, x):
         x = self.conv1_1(x)
-        x = self.stochastic_activation(x)
         x = self.relu1_1(x)
         x = self.stochastic_activation(x)
         x = self.conv1_2(x)
-        x = self.stochastic_activation(x)
         x = self.relu1_2(x)
         x = self.stochastic_activation(x)
         x = self.maxpool1(x)
 
         x = self.conv2_1(x)
-        x = self.stochastic_activation(x)
         x = self.relu2_1(x)
         x = self.stochastic_activation(x)
         x = self.conv2_2(x)
-        x = self.stochastic_activation(x)
         x = self.relu2_2(x)
         x = self.stochastic_activation(x)
         x = self.maxpool2(x)
 
         x = self.conv3_1(x)
-        x = self.stochastic_activation(x)
         x = self.relu3_1(x)
         x = self.stochastic_activation(x)
         x = self.conv3_2(x)
-        x = self.stochastic_activation(x)
         x = self.relu3_2(x)
         x = self.stochastic_activation(x)
         x = self.conv3_3(x)
-        x = self.stochastic_activation(x)
         x = self.relu3_3(x)
         x = self.stochastic_activation(x)
         x = self.maxpool3(x)
 
         x = self.conv4_1(x)
-        x = self.stochastic_activation(x)
         x = self.relu4_1(x)
         x = self.stochastic_activation(x)
         x = self.conv4_2(x)
-        x = self.stochastic_activation(x)
         x = self.relu4_2(x)
         x = self.stochastic_activation(x)
         x = self.conv4_3(x)
-        x = self.stochastic_activation(x)
         x = self.relu4_3(x)
         x = self.stochastic_activation(x)
         x = self.maxpool4(x)
 
         x = self.conv5_1(x)
-        x = self.stochastic_activation(x)
         x = self.relu5_1(x)
         x = self.stochastic_activation(x)
         x = self.conv5_2(x)
-        x = self.stochastic_activation(x)
         x = self.relu5_2(x)
         x = self.stochastic_activation(x)
         x = self.conv5_3(x)
-        x = self.stochastic_activation(x)
         x = self.relu5_3(x)
         x = self.stochastic_activation(x)
         x = self.maxpool5(x)
@@ -209,19 +196,23 @@ class VGG16Ex(nn.Module):
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc1(x)
-        x = self.stochastic_activation(x)
         x = self.relu6(x)
         x = self.stochastic_activation(x)
         x = self.fc2(x)
-        x = self.stochastic_activation(x)
         x = self.relu7(x)
         x = self.stochastic_activation(x)
         x = self.fc3(x)
 
         return x
     def stochastic_activation(self, x):
-        mask = torch.rand_like(x) < self.loss_chance  # 5% probability for 0, 95% probability for 1
-        return x * (~mask).float()  # Apply mask to zero out 5% of the values
+        mask = torch.rand_like(x) < self.loss_chance  
+        #this HAS scaling
+        return x  * (~mask).float()
+        # y = x  * (~mask).float()
+        # scale = 1.0
+        # if(self.loss_chance>0):
+        #     scale = (1.0/(1-self.loss_chance)) 
+        # return scale * y
 
 
 

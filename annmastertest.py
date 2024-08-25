@@ -20,7 +20,7 @@ from VGG16 import VGG16Ex, EncoderDecoder
 import torchvision.models as models
 from VGG11Cifar100 import VGG11Ex
 import pandas as pd
-dataset = "cifar10"
+dataset = "cifar100"
 encoder = False
 
 
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     train_dataset = None
     if(dataset == "mnist"):
     # Download the dataset
+        print("mnist")
         train_dataset = datasets.MNIST(
             root=os.path.join("..", "..","..", "data", "MNIST"), train=True, transform=my_transforms, download=True
         )
@@ -54,6 +55,7 @@ if __name__ == '__main__':
         )
     if(dataset == "cifar10"):
     # Download the dataset
+        print("cifar10")
         train_dataset = datasets.CIFAR10(
             root=os.path.join("..", "..","..", "data", "CIFAR10"), train=True, transform=my_transforms, download=True
         )
@@ -81,7 +83,7 @@ if __name__ == '__main__':
 
     # Load Data
     batch_size = 64
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
     
@@ -89,20 +91,20 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 1e-8
-    num_epochs = 5
+    learning_rate = 7e-5 #9.4E-5 = 20% 5 EPOCH
+    num_epochs = 50
     
     
     #create model array
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
+    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
     # models.add(model)
     
     # model.to(device)
 
-    # model_o = VGG16Ex(num_classes=100)
+    model_o = VGG16Ex(num_classes=100)
     # model_o = EncoderDecoder(num_classes=10)
     # model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
@@ -115,13 +117,14 @@ if __name__ == '__main__':
     yes_yes = np.array([])
     yes_no = np.array([])
     no_yes = np.array([])
-    while learning_rate < 1e-2:
+    while learning_rate < 1e-3:
+        print(learning_rate)
         model = copy.deepcopy(model_o)
         model.to(device)
         criterion = nn.CrossEntropyLoss()
         if(encoder == True):
             criterion = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
         for epoch in range(num_epochs):
             losses = []
 
@@ -167,7 +170,7 @@ if __name__ == '__main__':
             else:
                 empty = []
                 check_accuracy(val_loader, model, device, empty)
-        learning_rate = learning_rate*4
+        learning_rate = learning_rate+2e-4
     model = copy.deepcopy(model_o)
     model.loss_chance = 0.0
     model.to(device)

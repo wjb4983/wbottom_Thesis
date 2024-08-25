@@ -20,8 +20,9 @@ from VGG16 import VGG16Ex, EncoderDecoder
 import torchvision.models as models
 from VGG11Cifar100 import VGG11Ex
 import pandas as pd
+# dataset = "Flowers102"
 dataset = "cifar10"
-encoder = False
+encoder = True
 
 
 if __name__ == '__main__':
@@ -37,8 +38,8 @@ if __name__ == '__main__':
     intensity = args.intensity
     my_transforms = transforms.Compose(
         [
-         transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)
-         ]
+          transforms.ToTensor(), transforms.Lambda(lambda x: x * intensity)
+          ]
     )
     train_dataset = None
     if(dataset == "mnist"):
@@ -75,12 +76,32 @@ if __name__ == '__main__':
         test_dataset = datasets.CIFAR100(
             root=os.path.join("..", "..","..", "data", "CIFAR100"), train=False, transform=my_transforms,download=True
         )
-
+    if(dataset == "Flowers102"):
+        my_transforms = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        train_dataset = datasets.Places365(
+            root=os.path.join("E:/data/102Flowers"), 
+            split='train-standard', 
+            # train=True,
+            transform=my_transforms, download=False
+        )
+        test_dataset = datasets.Places365(
+            root=os.path.join("E:/data/102Flowers"), 
+            split='val', 
+            # train=False,
+            transform=my_transforms,download=False
+        )
+        # test_dataset = datasets.Places365(
+            # root=os.path.join("..", "..","..", "data", "Places365"), train=False, transform=my_transforms,download=True
+        # )
     # if device=="gpu" and torch.cuda.is_available():
         # torch.cuda.manual_seed_all(0)
 
     # Load Data
-    batch_size = 64
+    batch_size = 128
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
@@ -89,21 +110,21 @@ if __name__ == '__main__':
 
     
     # Hyperparameters
-    learning_rate = 4e-6
-    num_epochs = 5
+    learning_rate = 9.4e-5
+    num_epochs = 10
     
     
     #create model array
     # models = {}
     # model_o = VGGSmallEx(num_classes=10)
     # models.add(model)
-    model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
+    # model_o = FCNetwork(3*32*32, 200, 10, 0.0, 2) 
     # models.add(model)
     
     # model.to(device)
 
     # model_o = VGG16Ex(num_classes=100)
-    # model_o = EncoderDecoder(num_classes=10)
+    model_o = EncoderDecoder(num_classes=10)
     # model_o = VGG11Ex(num_classes=10)
     # Loss and optimizer
 
@@ -111,18 +132,19 @@ if __name__ == '__main__':
     print(model_o)
     # Train Network
     first_image = None
-    p = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    p = [0.0, 0.1, 0.25, 0.5, 0.75]#0.05, 0.1, 0.2, 0.3, 0.5, 0.75]#, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
     yes_yes = np.array([])
     yes_no = np.array([])
     no_yes = np.array([])
     for x in p:
+        print(learning_rate)
         model = copy.deepcopy(model_o)
         model.loss_chance = x
         model.to(device)
         criterion = nn.CrossEntropyLoss()
         if(encoder == True):
             criterion = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
         for epoch in range(num_epochs):
             losses = []
 
@@ -249,7 +271,7 @@ if __name__ == '__main__':
     arr = np.column_stack((p, yes_yes, yes_no, no_yes))
     arr = arr.reshape(-1,4)
     df = pd.DataFrame(arr, columns=["%", "yes_yes", "yes_no", "no_yes"])
-    df.to_csv(f'FC_ep_{num_epochs}_lr_{learning_rate}_ds_{dataset}_bs_{batch_size}.csv', index=False)
+    df.to_csv(f'FC_ep_{num_epochs}_lr_{learning_rate}_ds_{dataset}_bs_{batch_size}(1-p).csv', index=False)
     # Check accuracy on training & test to see how good our model
 
     

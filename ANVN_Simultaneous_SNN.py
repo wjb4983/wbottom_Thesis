@@ -476,12 +476,12 @@ print('Converting ANN to SNN...')
 
 data=None
 from bindsnet.network.nodes import LIFNodes
-SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=LIFNodes, tc_decay=20.0)# node_type=ANVN_SRIFNodes)
-SNN.connections['0','1'].w *=5
+SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=LIFNodes, tc_decay=60.0)# node_type=ANVN_SRIFNodes)
+SNN.connections['0','1'].w *=7
 SNN.connections['2','3'].w *=100
-SNN.layers['1'].refrac=torch.tensor(5)
+SNN.layers['1'].refrac=torch.tensor(20)
 SNN.layers['3'].refrac=torch.tensor(5)
-SNN.layers['3'].tc_decay=torch.tensor(0)
+SNN.layers['3'].tc_decay=torch.tensor(10)
 
 print(SNN)
 

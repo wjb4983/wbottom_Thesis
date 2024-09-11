@@ -23,17 +23,16 @@ from bindsnet.evaluation import all_activity, assign_labels, proportion_weightin
 from bindsnet.models import DiehlAndCook2015
 from bindsnet.network.monitors import Monitor
 from bindsnet.utils import get_square_assignments, get_square_weights
-from ANVN import ANVN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--n_neurons", type=int, default=100)
-parser.add_argument("--batch_size", type=int, default=250)
+parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--n_test", type=int, default=10000)
 parser.add_argument("--n_train", type=int, default=60000)
 parser.add_argument("--n_workers", type=int, default=-1)
-parser.add_argument("--n_updates", type=int, default=30)
+parser.add_argument("--n_updates", type=int, default=30000)
 parser.add_argument("--exc", type=float, default=22.5)
 parser.add_argument("--inh", type=float, default=120)
 parser.add_argument("--theta_plus", type=float, default=0.7)
@@ -43,7 +42,7 @@ parser.add_argument("--intensity", type=float, default=128)
 parser.add_argument("--progress_interval", type=int, default=10)
 parser.add_argument("--train", dest="train", action="store_true")
 parser.add_argument("--test", dest="train", action="store_false")
-parser.add_argument("--plot", dest="plot", action="store_false")
+parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.set_defaults(plot=True, gpu=True)
 
@@ -67,7 +66,6 @@ progress_interval = args.progress_interval
 train = args.train
 plot = args.plot
 gpu = args.gpu
-plot=False
 
 update_steps = int(n_train / batch_size / n_updates)
 update_interval = update_steps * batch_size

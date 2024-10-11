@@ -733,10 +733,11 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 SNN.to('cpu')
 print("Net spikes: ", net_spikes)
+
 if num_data>0:
     SNN_accuracy = 100.0 * float(correct) / float(num_data)
-    
-    print("accuracy reduced spikes: ", SNN_accuracy)
+    print("Net spikes: ", net_spikes/num_data)
+    print("accuracy baseline: ", SNN_accuracy)
 
 print("ANVN")
 print("="*30)
@@ -761,6 +762,7 @@ neuron_spikes = (neuron_spikes-np.min(neuron_spikes))/(np.max(neuron_spikes) - n
 energies = [x for x in range(250,-1,-25)]
 start=1
 multipliers = [1,2,4,6,8,10]
+results = pd.DataFrame(columns=['Max Energy', 'Energy', 'SNN Accuracy', 'Average Spikes'])
 for multiplier in multipliers:
     print("0"*30,"\n\n","0"*30)
     print("multiplier: ", multiplier)
@@ -877,8 +879,15 @@ for multiplier in multipliers:
         print("accuracy reduced spikes: ", SNN_accuracy2)
         print("net_spikes reduced spikes: ", net_spikes2)
         print("net_spikes reduced spikes #im adjusted: ", net_spikes2/num_data2)
+        new_row = pd.DataFrame({
+            'Max Energy': [multipliers],
+            'Energy': [energy],
+            'SNN Accuracy': [SNN_accuracy2],
+            'Average Spikes': [(net_spikes2/num_data2).cpu().item()]
+        })
         # df.to_csv(f"accuracy_{lam}.csv")
         # print(f"baseline weights pos: {baseline_pos} neg: {baseline_neg} mag {baseline_mag}")
         # print(f"algo weights pos: {alg_pos} neg: {alg_neg} mag {alg_mag}")
         print("="*30)
         del SNN_copy
+results.to_excel(f'ANVNSequential.xlsx', index=False)

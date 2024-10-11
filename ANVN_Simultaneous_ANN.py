@@ -251,8 +251,9 @@ class Net(nn.Module):
     #     return F.log_softmax(x, dim=1) - l2_reg  # Subtract regularization term from output
 
 
-model = Net(clip_value=99999999.0).to(device)
+model = Net().to(device)
 optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5, weight_decay=.001)
+# optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
 # print(type(model.children().next()))
 ANVN_N = ANVN(2,128)
@@ -288,7 +289,7 @@ def train(epoch, log_interval=100):
             # print(ANVN_N.root.forward())
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.data.item()))
+                        100. * batch_idx / len(train_loader), loss.data.item()))
         
 def validate(loss_vector, accuracy_vector):
     model.eval()

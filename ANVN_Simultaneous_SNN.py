@@ -476,7 +476,7 @@ print('Converting ANN to SNN...')
 
 data=None
 from bindsnet.network.nodes import LIFNodes
-SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=LIFNodes)# node_type=ANVN_SRIFNodes)
+SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=ANVN_SRIFNodes) #node_type=LIFNodes)#
 SNN.connections['0','1'].w *=7
 SNN.connections['2','3'].w *=100
 SNN.layers['1'].refrac=torch.tensor(12)
@@ -488,6 +488,9 @@ print(SNN)
 
 SNN.add_monitor(
     Monitor(SNN.layers['3'], state_vars=['v'], time=time), name='3'
+)
+SNN.add_monitor(
+    Monitor(SNN.layers['1'], state_vars=['v'], time=time), name='1'
 )
 
 SNN.to(device)
@@ -563,6 +566,99 @@ import numpy as np
 import copy
 from copy import deepcopy
 import matplotlib.pyplot as plt
+###################################
+for index, (data, target) in enumerate(train_loader2):
+        # if index * batch_size > 100:
+            # break
+        start = t_()
+        # print(index*batch_size)
+        # if index > 100:
+        #     break
+        num_data +=100
+        # print('sample ', index+1, 'elapsed', t_() - start)
+        start = t_()
+    
+        data = data.to(device)
+        data = data.view(-1, 3*32*32)
+        # print(data.shape)
+        inpts = {'Input': data.repeat(time, 1, 1)}
+        # print(inpts["Input"].shape)
+        # print(inpts["Input"].shape)
+        # print(inpts["Input"].shape)
+        SNN.run(inputs=inpts, time=time)
+        s = {layer: SNN.monitors[f'{layer}_spikes'].get('s') for layer in SNN.layers}
+        voltages = {layer: SNN.monitors[layer].get('v') for layer in ['3'] if not layer == 'Input'}
+        # pred = torch.argmax(voltages['2'].sum(1))
+        # summed_voltages = voltages['2'].sum(0)
+        # print(summed_voltages.shape)
+        # print(s['2'].shape)
+        if neuron_spikes == None:
+            neuron_spikes = s['1'].sum((0,1))
+        else:
+            neuron_spikes += s['1'].sum((0,1))
+        summed_spikes=s['3'].sum(0)
+        # print(summed_spikes)
+        net_spikes += summed_spikes.sum()+ s['1'].sum()
+        # pred = torch.argmax(summed_voltages, dim=1).to(device)
+        pred = torch.argmax(summed_spikes, dim=1).to(device)
+        # print(pred, target)
+        # correct += pred.eq(target.data.to(device)).cpu().sum()
+        # print(pred)
+        # print(target)
+        correct += pred.eq(target).sum().item()
+        # if index == 0:
+        #     ciu = calculate_intermediate_usefulness(s['1'], SNN.connections["1","2"].w, target, time)
+        # else:
+        #     ciu += calculate_intermediate_usefulness(s['1'], SNN.connections["1","2"].w, target, time)
+        spikes_ = {
+            layer: spikes[layer].get("s")[:].contiguous() for layer in spikes
+        
+        }
+        # print("Curr time", t_() - start)
+        # spikes_ = {
+            # layer: spikes2[layer].get("s")[:, 0].contiguous() for layer in spikes2
+        # }
+        # keys = list(spikes_.keys())
+        # for i in range(0, len(keys), 2):
+        #     # Get two consecutive layers from spikes_
+            
+        #     layer1_key = keys[i]
+        #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
+            
+        #     # Get the spike data for the current layers
+        #     layer1_spikes = spikes_[layer1_key]
+        #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
+        #     if(layer2_spikes == None):
+        #         ims[i], axes[i] = plot_spikes(
+        #             {layer1_key: layer1_spikes},
+        #             ims=ims[i], axes=axes[i]
+        #         )
+        #     else:
+        #         ims[i], axes[i] = plot_spikes(
+        #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
+        #             ims=ims[i], axes=axes[i]
+        #         )
+        #     for ax in axes[i]:
+        #         ax.xaxis.set_major_locator(MultipleLocator(20))
+        #         ax.set_xlim(0,100)
+        # voltage_ims, voltage_axes = plot_voltages(
+        #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
+        # )
+        SNN.reset_state_variables()
+    # torch.save(neuron_spikes, "hidden_spikes_256.pt")
+# print(neuron_spikes)
+
+import numpy as np
+import copy
+from copy import deepcopy
+import matplotlib.pyplot as plt
+SNN.to('cpu')
+print("Net spikes: ", net_spikes)
+if num_data>0:
+    SNN_accuracy = 100.0 * float(correct) / float(num_data)
+    print(net_spikes/num_data)
+    print("accuracy reduced spikes: ", SNN_accuracy)
+    ##########################
 SNN.to('cpu')
 print("Net spikes: ", net_spikes)
 

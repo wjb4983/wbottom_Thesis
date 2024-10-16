@@ -198,6 +198,10 @@ class LIFNET(Network):
         # self.inpt_shape = inpt_shape
         # self.n_neurons = n_neurons
 
+# Initialize the network
+# network = LIFNET(
+#     n_inpt=784, n_neurons=args.n_neurons, exc=args.exc, inh=args.inh, dt=args.dt,
+#     theta_plus=args.theta_plus, tc_theta_decay=1e7, inpt_shape=(1, 28, 28)
         # # Layers
         # input_layer = Input(n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0)
         # exc_layer = DiehlAndCookNodes(
@@ -360,6 +364,18 @@ network = LIFNET(
 #     nu=(1e-4, 1e-2),
 #     theta_plus=theta_plus,
 #     inpt_shape=(1, 28, 28),)
+
+# network = DiehlAndCook2015(
+#     n_inpt=784,
+#     n_neurons=n_neurons,
+#     exc=exc,
+#     inh=inh,
+#     dt=dt,
+#     norm=78.4,
+#     nu=(1e-4, 1e-2),
+#     theta_plus=theta_plus,
+#     inpt_shape=(1, 28, 28),
+# )
 
 
 # Directs network to GPU

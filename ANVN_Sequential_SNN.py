@@ -759,9 +759,9 @@ neuron_spikes = (neuron_spikes-np.min(neuron_spikes))/(np.max(neuron_spikes) - n
 # print("Tree output values:", tree_output)
 
 # print("grad:",(neuron_spikes)-tree_output)
-energies = [x for x in range(250,-1,-25)]
+energies = [x for x in range(1000,0,-50)]
 start=1
-multipliers = [1,2,4,6,8,10]
+multipliers = [1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,33,37,40]
 results = pd.DataFrame(columns=['Max Energy', 'Energy', 'SNN Accuracy', 'Average Spikes'])
 for multiplier in multipliers:
     print("0"*30,"\n\n","0"*30)

@@ -17,9 +17,9 @@ max_energy=9
 verbose=0
 plot=0
 loop_max_energy = True
-max_energies = [1,2,4,6,8,10, 12, 14]
+max_energies = [1,2,4,6,8,10, 12, 14,16,18,20,22,24,26,28,30,35,40,45,50]
 # max_energies = [1]
-n=4
+n=2
 
 
 from bindsnet.analysis.plotting import (
@@ -1121,7 +1121,7 @@ if loop_max_energy:
 else:
     # energies = [0,1,32,128,256,512,1024]
     # energies = [0]
-    energies = [x for x in range(250,-1,-25)]
+    energies = [x for x in range(25, 1001, 50)]
     for energy in energies:
         
         SNN_copy = deepcopy(SNN)

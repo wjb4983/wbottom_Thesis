@@ -346,8 +346,8 @@ class SubtractiveResetIFNodes(nodes.Nodes):
             self.refrac_count = (self.refrac_count > 0).float() * (self.refrac_count - self.dt)
     
             # Check for spiking neurons
-            # if self.v.shape[0] < self.thresh_tensor.shape[0]:
-            #     self.thresh_tensor = self.thresh_tensor[:self.v.shape[0],:]
+            if self.v.shape[0] < self.thresh_tensor.shape[0]:
+                self.thresh_tensor = self.thresh_tensor[:self.v.shape[0],:]
             
             if self.v.shape[0] == self.available_energies.shape[0]:
                 enough_energy_mask = self.available_energies >=1
@@ -360,9 +360,9 @@ class SubtractiveResetIFNodes(nodes.Nodes):
     
             # Refractoriness and voltage reset
             self.refrac_count.masked_fill_(self.s, self.refrac)
-            # self.v[self.s] -= self.thresh_tensor[self.s]  # Use correct indexing
+            self.v[self.s] -= self.thresh_tensor[self.s]  # Use correct indexing
             #THRESHCHANGE
-            self.v[self.s] -= self.thresh_tensor
+            # self.v[self.s] -= self.thresh_tensor
             # Voltage clipping to lower bound
             if self.lbound is not None:
                 self.v = torch.max(self.v, self.lbound)
@@ -376,8 +376,8 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         super().reset_state_variables()
         self.v.fill_(self.reset)
         self.refrac_count.zero_()
-        # self.thresh_tensor = self.original_thresh.clone()  # Restore original  #THRESHCHANGE
-        self.thresh_tensor = torch.tensor(1)
+        self.thresh_tensor = self.original_thresh.clone()  # Restore original  #THRESHCHANGE
+        # self.thresh_tensor = torch.tensor(1)
         self.available_energies = torch.zeros(batch_size, num_hidden, dtype=torch.float, device='cuda')
 
     def set_batch_size(self, batch_size: int) -> None:
@@ -399,8 +399,8 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         self.refrac_count = torch.zeros_like(self.v, device=device)
         # Create the threshold tensor of shape [batch_size, n_neurons]
         #XXXXXX# self.thresh_tensor = self.thresh.unsqueeze(0).expand(batch_size, -1)
-        # self.thresh_tensor= self.thresh #THRESHCHANGE
-        self.thresh_tensor = torch.tensor(1)
+        self.thresh_tensor= self.thresh #THRESHCHANGE
+        # self.thresh_tensor = torch.tensor(1)
         self.original_thresh = self.thresh.clone()  # Save original thresh
     def set_non_hidden(self):
         self.non_hidden=True
@@ -983,13 +983,13 @@ if loop_max_energy:
         print("Max Energy -", me)
         # energies = [0,1,32,128,256,512,1024]
         # energies = [0]
-        energies = [x for x in range(1000,24,-50)]
+        energies = [x for x in range(25, 1001, 50)]
         for energy in energies:
             
             SNN_copy = deepcopy(SNN)
             SNN_copy.to("cuda")
-            SNN_copy.layers["1"].set_spike_limit(energy*2)
-            print(SNN_copy.layers["1"].spike_limit)
+            # SNN_copy.layers["1"].set_spike_limit(9999999999)
+            # print(SNN_copy.layers["1"].spike_limit)
             alg_pos = 0
             alg_neg = 0
             alg_mag = 0
@@ -1005,16 +1005,18 @@ if loop_max_energy:
                 ANVN_N.root.clip()
                 with open('ANVN.pkl', 'wb') as f:
                     pickle.dump(ANVN_N, f)
+
                 ANVN_N.energy = energy
                 ANVN_N.root.energy=energy
                 tree_output = ANVN_N.root.forward()
+                # tree_output2 = torch.full_like(torch.tensor(tree_output), 99999999)
                 SNN_copy.layers['1'].set_energy_tensor(torch.tensor(tree_output))
+                
+
                 print(np.mean(tree_output), np.median(tree_output), np.std(tree_output))
                 # print("checksum: ", ANVN_N.root.checksum())
                 # print( SNN_copy.layers['1'].thresh)
                 # print(np.sum(tree_output))
-                # - 1*2 = 2
-                # 2 - [0,1] = range between 2 and 1
                 
                 multiplier = me#np.max(tree_output)-1
                 maxx = multiplier
@@ -1024,7 +1026,8 @@ if loop_max_energy:
                 # counts, bins = np.histogram(tree_output, 30)
                 # plt.stairs(counts, bins)
                 SNN_copy.layers['3'].set_non_hidden()
-                # SNN_copy.layers['1'].thresh = (SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)).unsqueeze(0).repeat(batch_size,1)
+                SNN_copy.layers['1'].thresh = (SNN_copy.layers['1'].thresh * maxx -torch.tensor(tree_output, device = device)).unsqueeze(0).repeat(batch_size,1)
+
             # print( SNN_copy.layers['1'].thresh)
             for conn in set(SNN_copy.connections.values()):
                 alg_pos += torch.sum(conn.w[conn.w>0])
@@ -1246,4 +1249,4 @@ else:
         print("="*30)
         del SNN_copy
         
-results.to_excel(f'ANVNSimultaneous_{n}n_root_bank_long.xlsx', index=False)
+results.to_excel(f'ANVNSimultaneous_{n}n_root_bank.xlsx', index=False)

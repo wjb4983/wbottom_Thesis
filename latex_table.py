@@ -17,7 +17,7 @@ def create_latex_table(data, colored_func_name_acc):
     table += "\\hline\n"
     
     # Create header row for Max Energy
-    header = "Energy & " + " & ".join(map(str, threshs[6:num_max_energy+6])) + " \\\\\n"
+    header = "Energy & " + " & ".join(map(str, threshs)) + " \\\\\n"
     table += header
     table += "\\hline\n"
     

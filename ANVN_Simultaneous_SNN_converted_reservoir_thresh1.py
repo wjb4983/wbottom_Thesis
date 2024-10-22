@@ -19,7 +19,7 @@ plot=0
 loop_max_energy = True
 max_energies = [1,2,4,6,8,10, 12, 14,16,18,20,22,24,26,28,30,35,40,45,50]
 # max_energies = [1]
-n=2
+n=1
 
 
 from bindsnet.analysis.plotting import (

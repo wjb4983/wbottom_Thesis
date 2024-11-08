@@ -9,6 +9,8 @@ import pandas as pd
 import os
 from matplotlib.ticker import MultipleLocator
 import numpy as np
+from ReLU_Scaler import ReLU_Scaler
+from ANVN_simul import ANVN
 
 batch_size=255
 num_hidden=512
@@ -182,44 +184,6 @@ class ANVN_SRIFNodes(SubtractiveResetIFNodes):
         # print(self.original_thresh)
         # print(self.thresh)
 
-def calculate_intermediate_usefulness(intermediate_spike_record, weight_matrix, correct_neuron_indices, total_time):
-    """
-    Calculate the usefulness of intermediate layer neurons based on their spike contributions
-    to the correct classification neuron in the final layer.
-
-    Parameters:
-    - intermediate_spike_record: A tensor of shape [time, batch_size, intermediate_neurons].
-    - weight_matrix: A tensor of shape [intermediate_neurons, final_neurons] representing weights from intermediate to final layer.
-    - correct_neuron_indices: A tensor of shape [batch_size] with indices of the correct classification neurons for each batch.
-    - total_time: Total simulation time.
-
-    Returns:
-    - usefulness_scores: A tensor of usefulness scores for each intermediate neuron for each batch.
-    """
-    # Sum spikes along the time dimension
-    spike_sums = intermediate_spike_record.sum(dim=0)  # Shape: [batch_size, intermediate_neurons]
-
-    # Initialize the usefulness scores tensor
-    intermediate_neurons = spike_sums.shape[1]
-    usefulness_scores = torch.zeros(intermediate_neurons)
-
-    # Iterate over each batch element
-    for batch_idx in range(spike_sums.shape[0]):
-        correct_neuron_index = correct_neuron_indices[batch_idx]
-
-        # Get the weights for the correct output neuron
-        weights = weight_matrix[:, correct_neuron_index]  # Shape: [intermediate_neurons]
-
-        # Update usefulness scores based on weights and spikes
-        positive_weights = weights > 0
-        negative_weights = weights < 0
-
-        usefulness_scores[positive_weights] += spike_sums[batch_idx, positive_weights]
-        usefulness_scores[negative_weights] -= spike_sums[batch_idx, negative_weights]
-
-    return usefulness_scores
-
-
 
 percentile = 99.999
 random_seed = 0
@@ -240,177 +204,8 @@ else:
     print("Cuda is not available")
 
 
-class ANVN():
-    def __init__(self, branching_factor, energy):
-        self.branching_factor = branching_factor
-        self.energy = energy
-        self.root = ANVN_Node(self.branching_factor,False,self.energy,True)
-        num_layers = math.ceil(math.log(num_hidden,self.branching_factor))
-        def add_layer(parent_node, depth):
-            if depth < num_layers - 1:
-                parent_node.children = [ANVN_Node(self.branching_factor, False,0, False) for _ in range(self.branching_factor)]
-                for child in parent_node.children:
-                    add_layer(child, depth + 1)
-            else:
-                parent_node.children = [ANVN_Node(0, True,0, False) for _ in range(self.branching_factor)]
 
-        add_layer(self.root, 0)
-        
-import numpy as np
-class ANVN_Node():
-    def __init__(self, num_children, is_leaf, energy, is_head):
-        self.alpha = 0.1
-        self.children = []
-        self.energy = energy
-        self.is_head = is_head
-        self.num_children = num_children
-        self.is_leaf = is_leaf
-        unnormalized_weights = np.random.rand(num_children)
-        self.weights = unnormalized_weights / np.sum(unnormalized_weights)
-    def forward(self, energy = None):
-        if energy==None:
-            energy=self.energy
-        # Simulate forward propogation
-        # Just calculates what the energy values should be for leafs & intermediate nodes
-        if torch.is_tensor(energy):
-            if str(energy.device) == 'cuda:0' or str(energy.device) == 'cuda':
-                energy = energy.cpu()
-            energy = energy.numpy()
-        if self.is_leaf:
-            # print(energy)
-            self.energy=energy
-            return np.array([self.energy])
-        else:
-            self.energy = energy
-            # print(energy)
-            child_energies = self.weights * energy
-            return np.concatenate([child.forward(child_energy) for child, child_energy in zip(self.children, child_energies)])
-        
-    def backprop(self, train_bias):
-        # Currently only uses gradient between hidden node's bias and calculated 
-        # what its new bias would be given energy forward prop
-        
-        #turn into numpy
-        if torch.is_tensor(train_bias):
-            if str(train_bias.device) == 'cuda:0' or str(train_bias.device) == 'cuda':
-                train_bias = train_bias.cpu()
-            train_bias = train_bias.numpy()
-            
-            
-        my_energy = self.getenergies()                     #gets array of leaf energies (EL)
-        #we are calling gradient 
-        # GT - my guess
-        #convert "bias" to energy:
-        train_bias = 1 + train_bias
-        gradient = (train_bias-my_energy) * self.alpha #DELTA = EN-EL
-        # energy_gradient = 1 + gradient                     #MATH SAYS TO ADD
-        self.setgradient(gradient)    #set gradient
-        # for i in range(self.getdepth()):
-        self.setenergies()                   #then update energy that the node I am at currently distributes down before normalization
-        self.updateweights()  
-    def updateweights(self):
-        # Just updates the weights based on backprop gradients - not ture anymore
-        # Intermediate nodes gradient = average of 
-        if self.is_leaf:
-            return self.energy
-        else:
-            #Here we calculate how much energy each child is using and then normalize it between 0 and 1
-            child_energies = np.array([child.updateweights() for child in self.children])
-            child_energies = child_energies.flatten()
-            new_grad = np.average(child_energies)
-            # print(child_grad)
-            if verbose:
-                print("before weight",self.weights)
-            self.weights = child_energies/np.sum(child_energies)
-            if verbose:
-                print("after weight",self.weights)
 
-            # This might do something?
-            # This is supposed to make the nodes coming from the head node have
-            # Custom weights proportional to the energy taken
-            # so the weights can add up to < head.energy
-            # However once backprop is done, this never happens
-            if self.is_head:
-                total_used_energy = np.sum(self.getenergies())
-                self.weights = self.weights*(total_used_energy/self.energy)
-            return new_grad
-            
-    #sets gradient at leaf nodes
-    def setgradient(self, grad):
-        # Takes gradient of each leaf calculated and puts it in the right leaf
-        # Doesn't give gradient for the intermediate nodes
-        if self.is_leaf:
-            self.gradient = grad
-        else:
-            # print(grad)
-            # print(self.num_children)
-            childgrad = np.split(grad, self.num_children)
-            for child, child_gradient in zip(self.children, childgrad):
-                child.setgradient(child_gradient)
-            
-    #gets sum of all energies at leaf
-    def checksum(self):
-        if self.is_leaf:
-            return np.abs(self.energy)
-        else:
-            return np.sum([child.checksum() for child in self.children])
-        
-    #gets array of all energies at leaf
-    def getenergies(self):
-        if self.is_leaf:
-            return np.array([self.energy])
-        else:
-            return np.concatenate([child.getenergies() for child in self.children])
-        
-    #Updates energies at leaf using the gradient
-    def setenergies(self, time=0):
-        if self.is_leaf:
-            # if time == 0:
-            #     if verbose:
-            #         print("before",self.energy,"after",self.gradient)
-            self.energy = np.clip(self.energy+self.gradient, 0, max_energy)
-            return self.energy
-        else:
-            self.energy = np.sum([child.setenergies(time) for child in self.children])
-            return self.energy
-        
-    def getdepth(self):
-        if self.is_leaf:
-            return 0
-        else:
-            return 1 + self.children[0].getdepth()
-    def clip(self):
-        self.energy = np.clip(self.energy, 0, max_energy)
-
-class ReLU_Scaler(nn.Module):
-    def __init__(self, input_size, energy_init=1.0):
-        """
-        Initialize the EnergyScaledLayer.
-        
-        Parameters:
-        - input_size (int): Number of input neurons (size of the input tensor).
-        - energy_init (float): Initial value for the energy scaling factor.
-        """
-        super(ReLU_Scaler, self).__init__()
-        
-        # Initialize energy scaling factors, one for each input neuron
-        self.energy = nn.Parameter(torch.full((input_size,), energy_init))
-
-    def forward(self, x):
-        """
-        Forward pass through the EnergyScaledLayer.
-        
-        Parameters:
-        - x (torch.Tensor): Input tensor with activations from the previous layer.
-        
-        Returns:
-        - torch.Tensor: Output tensor with activations scaled by the energy factors.
-        """
-        # Element-wise multiplication of input activations with energy scaling factors
-        return x * self.energy
-    def update_energy(self, new_energy):
-        with torch.no_grad():
-            self.energy.copy_(new_energy)
 
 class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
@@ -467,7 +262,7 @@ train_loader2 = torch.utils.data.DataLoader(dataset=train_dataset2,
 
 model = Net()
 
-model.load_state_dict(torch.load("trained_model_cf_256_test!!!.pt"))
+model.load_state_dict(torch.load("trained_model_cf_256_simul_updated.pt"))
 # model.normalize_weights()
 # model = torch.load('trained_model.pt')
 
@@ -476,13 +271,13 @@ print('Converting ANN to SNN...')
 
 data=None
 from bindsnet.network.nodes import LIFNodes
-SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile, node_type=ANVN_SRIFNodes) #node_type=LIFNodes)#
-SNN.connections['0','1'].w *=7
-SNN.connections['2','3'].w *=100
-SNN.layers['1'].refrac=torch.tensor(12)
-SNN.layers['3'].refrac=torch.tensor(5)
-SNN.layers['1'].tc_decay=torch.tensor(20)
-SNN.layers['3'].tc_decay=torch.tensor(10)
+SNN = ann_to_snn(model, input_shape=(3,32,32), data=data, percentile=percentile)#, node_type=ANVN_SRIFNodes) #node_type=LIFNodes)#
+# SNN.connections['0','1'].w *=7
+# SNN.connections['2','3'].w *=100
+# SNN.layers['1'].refrac=torch.tensor(12)
+# SNN.layers['3'].refrac=torch.tensor(5)
+# SNN.layers['1'].tc_decay=torch.tensor(20)
+# SNN.layers['3'].tc_decay=torch.tensor(10)
 
 print(SNN)
 
@@ -683,8 +478,8 @@ print("="*30)
 # energies = [x for x in range(125,25,-25)]
 
 import pickle
-# energies = [0,1,32,128,256,512,1024]
-energies = [0]
+energies = [0,1,32,128,256,512,1024]
+# energies = [0]
 for energy in energies:
     
     SNN_copy = deepcopy(SNN)
@@ -702,7 +497,7 @@ for energy in energies:
     if energy != 0:
         ANVN_N = ANVN(2,energy)
         ANVN_N.root.clip()
-        with open('ANVN.pkl', 'wb') as f:
+        with open('ANVN_updated.pkl', 'wb') as f:
             pickle.dump(ANVN_N, f)
         ANVN_N.energy = energy
         ANVN_N.root.energy=energy

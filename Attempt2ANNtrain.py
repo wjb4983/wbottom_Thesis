@@ -65,14 +65,16 @@ validation_loader = torch.utils.data.DataLoader(dataset=validation_dataset,
 class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(3*32*32, 256, bias=False)
-        self.fc2 = nn.Linear(256, 10, bias=False)
+        self.fc1 = nn.Linear(3*32*32, 512, bias=False)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(512, 10, bias=False)
         self.clip_value=clip_value
 
 
     def forward(self, x):
             x = x.view(-1, 3*32*32)
             x = F.relu(self.fc1(x))
+            x = self.dropout(x)
             x = self.fc2(x)
             return F.log_softmax(x)
     def clip_weights(self):
@@ -153,4 +155,4 @@ for epoch in range(1, epochs + 1):
     validate(lossv, accv)
 
 
-torch.save(model.state_dict(), 'trained_model_cf_256.pt')
+torch.save(model.state_dict(), 'trained_model_cf_512_dropout_seq.pt')

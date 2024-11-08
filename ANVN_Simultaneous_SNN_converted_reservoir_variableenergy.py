@@ -11,14 +11,16 @@ from matplotlib.ticker import MultipleLocator
 import numpy as np
 import types
 
-batch_size=255
+batch_size=256
 num_hidden=512
 max_energy=9
 verbose=0
 plot=0
 loop_max_energy = True
-max_energies = [12, 14,16,18,20,22,24,26,28,30,35]
-n=5
+max_energies = [12,14,16,18,20,22,24,26,28,30,35]
+# timestep_refill=5
+e = 50#energy that a neuron/intermediate_reservoir can pull from above
+layer_depth=7
 
 
 from bindsnet.analysis.plotting import (
@@ -303,6 +305,10 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         self.change = 1
         self.available_energies = torch.zeros(batch_size, num_hidden, dtype=torch.float, device='cuda')
         self.energy_tensor = None
+        self.intermediate_energy_reservoir_tensor = None
+        self.energy = None
+        self.initial_energy_value = 0
+        self.intermediate_len = 0
 
     def forward(self, x: torch.Tensor) -> None:
         """
@@ -310,64 +316,106 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         :param x: Inputs to the layer.
         """
         if self.non_hidden:
-            # language=rst
-            """
-            Runs a single simulation step.
-
-            :param x: Inputs to the layer.
-            """
+            # Non-hidden layer processing as before
             self.thresh = torch.tensor(1, dtype=torch.float)
-            # Integrate input voltages.
             self.v += (self.refrac_count == 0).float() * x
-
-            # Decrement refractory counters.
-            self.refrac_count = (self.refrac_count > 0).float() * (
-                self.refrac_count - self.dt
-            )
-
-            # Check for spiking neurons.
+            self.refrac_count = (self.refrac_count > 0).float() * (self.refrac_count - self.dt)
             self.s = self.v >= self.thresh
-
-            # Refractoriness and voltage reset.
             self.refrac_count.masked_fill_(self.s, self.refrac)
-            self.v[self.s] = self.v[self.s] - self.thresh
-
-            # Voltage clipping to lower bound.
+            self.v[self.s] -= self.thresh
             if self.lbound is not None:
-                self.v.masked_fill_(self.v < self.lbound, self.lbound)
+                self.v = torch.max(self.v, self.lbound)
         else:
+            # Hidden layer processing with energy check and pulling from intermediate
             if self.v.dim() != x.dim():
-                raise ValueError("Input dimensions must match the neuron state dimensions")
+                raise ValueError("Input dimensions must match neuron state dimensions")
     
-            # Integrate input voltages
             self.v += (self.refrac_count == 0).float() * x
-    
-            # Decrement refractory counters
             self.refrac_count = (self.refrac_count > 0).float() * (self.refrac_count - self.dt)
     
             # Check for spiking neurons
+            if self.v.shape[0] == self.available_energies.shape[0]:
+                enough_energy_mask = self.available_energies >= 1
+            else:
+                self.available_energies = self.available_energies[:self.v.shape[0], :]
+                enough_energy_mask = self.available_energies >= 1
+            if self.energy is None or self.energy.shape[0] != self.v.shape[0]:
+                self.energy = torch.full((self.v.shape[0], 1), self.initial_energy_value, dtype=torch.float, device='cuda')
             if self.v.shape[0] < self.thresh_tensor.shape[0]:
                 self.thresh_tensor = self.thresh_tensor[:self.v.shape[0],:]
-            
-            if self.v.shape[0] == self.available_energies.shape[0]:
-                enough_energy_mask = self.available_energies >=1
-            else:
-                self.available_energies = self.available_energies[:self.v.shape[0],:]
-                enough_energy_mask = self.available_energies >=1
-            
+            if self.v.shape[0] < self.intermediate_energy_reservoir_tensor.shape[0]:
+                self.intermediate_energy_reservoir_tensor = self.intermediate_energy_reservoir_tensor[:self.v.shape[0],:]
             self.s = (self.v >= self.thresh_tensor) & enough_energy_mask
-            self.available_energies[self.s] -=1
+            self.available_energies[self.s] -= 1  # Deduct energy from spiking neurons
     
-            # Refractoriness and voltage reset
-            self.refrac_count.masked_fill_(self.s, self.refrac)
-            self.v[self.s] -= self.thresh_tensor[self.s]  # Use correct indexing
-            #THRESHCHANGE
-            # self.v[self.s] -= self.thresh_tensor
-            # Voltage clipping to lower bound
-            if self.lbound is not None:
-                self.v = torch.max(self.v, self.lbound)
+            # Find neurons that want to spike but lack energy
+            out_of_energy_mask = (self.v >= self.thresh_tensor) & ~enough_energy_mask
 
+            if out_of_energy_mask.any():
+                # Step 1: Determine grouping and indices for batch-neuron mapping
+                n = int(math.log2(self.available_energies.shape[1] // self.intermediate_energy_reservoir_tensor.shape[1]))
+                group_size = 2 ** n
+                
+                # Create indices to map each neuron to its corresponding intermediate group
+                indices = torch.div(
+                    torch.arange(self.available_energies.shape[1], device=self.available_energies.device).unsqueeze(0).expand(self.available_energies.shape[0], -1),
+                    group_size,
+                    rounding_mode='floor'
+                )
+                
+                required_energy = e
+            
+                # Step 2: Check intermediate reservoir energy levels
+                # Gather intermediate energy for each neuron group
+                intermediate_energy = self.intermediate_energy_reservoir_tensor.gather(1, indices)
+                
+                # Mask indicating neurons that need energy
+                energy_shortage_mask = out_of_energy_mask & (intermediate_energy < required_energy)
+                
+                # Step 3: Pull energy from main reservoir if intermediate reservoir is insufficient
+                main_reservoir_pull_needed = energy_shortage_mask & (self.energy >= required_energy)
+                
+                # Step 4: Refilling intermediate reservoir from main if needed
+                # Aggregate pull requests to match the intermediate reservoir tensor shape
+                grouped_main_pull_needed = torch.zeros_like(self.intermediate_energy_reservoir_tensor)
+                grouped_main_pull_needed.scatter_add_(1, indices, main_reservoir_pull_needed.float())
+                sum_grouped_main_pull_needed = grouped_main_pull_needed.sum(1).unsqueeze(-1)
+                # Update intermediate reservoir where needed
+                self.intermediate_energy_reservoir_tensor[grouped_main_pull_needed.bool()] += required_energy
+                # print(self.energy.shape, sum_grouped_main_pull_needed.shape, required_energy)
+                self.energy -= sum_grouped_main_pull_needed * required_energy
+                # self.intermediate_energy_reservoir_tensor[grouped_main_pull_needed.bool()] += required_energy
+                # self.energy[sum_grouped_main_pull_needed.bool()] -= sum_grouped_main_pull_needed
+                
+                # Step 5: Now, gather energy for neurons that still need it from the refilled intermediate reservoir
+                intermediate_energy = self.intermediate_energy_reservoir_tensor.gather(1, indices)
+                
+                # Mask for neurons to receive energy
+                final_energy_transfer_mask = out_of_energy_mask & (intermediate_energy >= required_energy)
+                self.available_energies[final_energy_transfer_mask] += intermediate_energy[final_energy_transfer_mask]
+                
+                # Subtract required energy from the intermediate reservoir for neurons that used it
+                # temp_subtraction = torch.zeros_like(self.intermediate_energy_reservoir_tensor)
+                # index_shape_adjusted = indices[final_energy_transfer_mask].unsqueeze(1).expand(-1, group_size)
+                # print(index_shape_adjusted.shape, indices.shape, final_energy_transfer_mask.shape)
+                # temp_subtraction.scatter_(1, index_shape_adjusted, required_energy)
+                # self.intermediate_energy_reservoir_tensor -= temp_subtraction
+                spikes_sum = torch.zeros_like(self.intermediate_energy_reservoir_tensor)
+
+                # Scatter the spikes per neuron group
+                # Assuming 'final_energy_transfer_mask' indicates which neurons spiked
+                spikes_needed = final_energy_transfer_mask.float()  # Convert boolean mask to float
+                spikes_sum.scatter_add_(1, indices, spikes_needed)  # Summing spikes at intermediate level
+                
+                # Step 2: Multiply aggregated spikes by required energy
+                # This will give the total energy to subtract from each intermediate group
+                energy_to_subtract = spikes_sum * required_energy
+                
+                # Step 3: Subtract the calculated energy from the intermediate reservoir
+                self.intermediate_energy_reservoir_tensor -= energy_to_subtract
+                
         super().forward(x)
+
 
     def reset_state_variables(self) -> None:
         """
@@ -379,6 +427,8 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         self.thresh_tensor = self.original_thresh.clone()  # Restore original  #THRESHCHANGE
         # self.thresh_tensor = torch.tensor(1)
         self.available_energies = torch.zeros(batch_size, num_hidden, dtype=torch.float, device='cuda')
+        self.energy = torch.full((batch_size, 1), self.initial_energy_value, dtype=torch.float, device='cuda')
+        self.intermediate_energy_reservoir_tensor = torch.zeros((batch_size, self.intermediate_len))
 
     def set_batch_size(self, batch_size: int) -> None:
         """
@@ -408,6 +458,12 @@ class SubtractiveResetIFNodes(nodes.Nodes):
         self.thresh_tensor = torch.tensor(1)
     def set_energy_tensor(self, energy_tensor):
         self.energy_tensor = energy_tensor
+    def set_intermediate_energy_reservoir_tensor(self, intermediate_tensor):
+        self.intermediate_energy_reservoir_tensor = torch.zeros((batch_size, len(intermediate_tensor)))
+        self.intermediate_len = len(intermediate_tensor)
+    def set_energy(self, energy):
+        self.initial_energy_value = energy
+        self.energy = torch.full((batch_size, 1), self.initial_energy_value, dtype=torch.float, device='cuda')
 
 
 
@@ -421,7 +477,7 @@ class ANVN_SRIFNodes(SubtractiveResetIFNodes):
         self.energy_usage = torch.zeros((self.batch_size, self.n), device=self.device)
         self.done = False
         self.non_hidden=False
-        self.ANVN_interval = n
+        # self.ANVN_interval = timestep_refill
 
     # def forward(self, *args, **kwargs):
     #     # Increment spike count for each batch element
@@ -451,27 +507,10 @@ class ANVN_SRIFNodes(SubtractiveResetIFNodes):
         if self.spike_counts.shape[0] != self.s.shape[0]:
             self.spike_counts = torch.zeros((self.s.shape[0], 1), device=self.device)
         if not self.non_hidden:
-            if timestep % self.ANVN_interval == 0:
-                self.available_energies += self.energy_tensor
+            # if timestep % self.ANVN_interval == 0:
+                # self.available_energies += self.energy_tensor
                 
             self.energy_usage += self.s
-            
-            # # Only update spike counts for batches that haven't already exceeded the spike limit
-            # self.spike_counts += self.s.sum(dim=1, keepdim=True)
-    
-            # # Lazy initialization of spike_limit_exceeded (only if not already initialized)
-            # if not hasattr(self, 'spike_limit_exceeded') or self.spike_limit_exceeded.size(0) != self.s.size(0):
-            #     self.spike_limit_exceeded = torch.zeros(self.s.size(0), 1, dtype=torch.bool, device=self.device)
-    
-            # # Update spike limit exceeded status for batches that haven't already exceeded the limit
-            # if not torch.all(self.spike_limit_exceeded):
-            #     exceeding_spikes = (self.spike_counts >= self.spike_limit) & (~self.spike_limit_exceeded)
-    
-            #     # If any batch exceeds the limit
-            #     if exceeding_spikes.any():
-            #         batch_indices = exceeding_spikes.nonzero(as_tuple=True)[0]
-            #         self.thresh_tensor[batch_indices, :] = float('inf')
-            #         self.spike_limit_exceeded[batch_indices] = True  # Mark these batches as having exceeded the limit
         super().forward(*args, **kwargs)
 
     def reset_state_variables(self) -> None:
@@ -685,6 +724,19 @@ class ANVN_Node():
             return 1 + self.children[0].getdepth()
     def clip(self):
         self.energy = np.clip(self.energy, 0, max_energy)
+    def collect_energies_at_depth(self, depth, current_depth=0):
+        if current_depth == depth:
+            return [self.energy]
+        
+        if self.is_leaf:
+            return []
+        
+        # Recursively collect energies from children and concatenate results
+        energies = []
+        for child in self.children:
+            energies.extend(child.collect_energies_at_depth(depth, current_depth + 1))
+        
+        return energies
 
 class ReLU_Scaler(nn.Module):
     def __init__(self, input_size, energy_init=1.0):
@@ -983,10 +1035,11 @@ if loop_max_energy:
         print("Max Energy -", me)
         # energies = [0,1,32,128,256,512,1024]
         # energies = [0]
-        energies = [x for x in range(250, 800, 50)]
-        refill_energies = [x for x in range(100, 3000, 300)]
+        energies = [x for x in range(50, 500, 50)]
+        refill_energies = [x for x in range(100, 1900, 300)]
         for energy in energies:
             for re in refill_energies:
+                print("refill energy - ", re)
                 SNN_copy = deepcopy(SNN)
                 SNN_copy.to("cuda")
                 # SNN_copy.layers["1"].set_spike_limit(9999999999)
@@ -1006,19 +1059,15 @@ if loop_max_energy:
                     ANVN_N.root.clip()
                     with open('ANVN.pkl', 'wb') as f:
                         pickle.dump(ANVN_N, f)
-    
+
                     ANVN_N.energy = energy
                     ANVN_N.root.energy=energy
                     tree_output = ANVN_N.root.forward()
-                    # tree_output2 = torch.full_like(torch.tensor(tree_output), 99999999)
-                    
-                    
+
+                    depth_5 = ANVN_N.root.collect_energies_at_depth(layer_depth)
+                    SNN_copy.layers['1'].set_intermediate_energy_reservoir_tensor(depth_5)
+                    SNN_copy.layers['1'].set_energy(re)
     
-                    print(np.mean(tree_output), np.median(tree_output), np.std(tree_output))
-                    # print("checksum: ", ANVN_N.root.checksum())
-                    # print( SNN_copy.layers['1'].thresh)
-                    # print(np.sum(tree_output))
-                    
                     multiplier = me#np.max(tree_output)-1
                     maxx = multiplier
                     greater_mask = tree_output>maxx
@@ -1256,4 +1305,4 @@ else:
         print("="*30)
         del SNN_copy
         
-results.to_excel(f'ANVNSimultaneous_{n}n_root_bank_varyenergy.xlsx', index=False)
+results.to_excel(f'ANVNSimultaneous_root_bank_varyenergy_interreservoir_layer{layer}.xlsx', index=False)

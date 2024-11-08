@@ -8,9 +8,10 @@ import pickle
 
 verbose=0
 num_hidden=512
-max_energy = 2
+max_energy = 10
 
 random_seed = 0
+energy = 512
 torch.manual_seed(random_seed)
 
 if torch.cuda.is_available():
@@ -58,7 +59,7 @@ class ANVN():
 import numpy as np
 class ANVN_Node():
     def __init__(self, num_children, is_leaf, energy, is_head):
-        self.alpha = 0.1
+        self.alpha = .1
         self.children = []
         self.energy = energy
         self.is_head = is_head
@@ -100,10 +101,10 @@ class ANVN_Node():
         #we are calling gradient 
         # GT - my guess
         #convert "bias" to energy:
-        train_bias = 1 + train_bias
-        gradient = (train_bias-my_energy) * self.alpha #DELTA = EN-EL
+        # train_bias = 1 + train_bias
+        # gradient = (train_bias-my_energy) * self.alpha #DELTA = EN-EL
         # energy_gradient = 1 + gradient                     #MATH SAYS TO ADD
-        self.setgradient(gradient)    #set gradient
+        self.setgradient(train_bias)    #set gradient
         # for i in range(self.getdepth()):
         self.setenergies()                   #then update energy that the node I am at currently distributes down before normalization
         self.updateweights()  
@@ -120,6 +121,8 @@ class ANVN_Node():
             # print(child_grad)
             if verbose:
                 print("before weight",self.weights)
+            if child_energies.sum() == 0:
+                child_energies = np.ones(child_energies.shape)
             self.weights = child_energies/np.sum(child_energies)
             if verbose:
                 print("after weight",self.weights)
@@ -167,7 +170,7 @@ class ANVN_Node():
             # if time == 0:
             #     if verbose:
             #         print("before",self.energy,"after",self.gradient)
-            self.energy = np.clip(self.energy+self.gradient, 0, max_energy)
+            self.energy = np.clip(self.energy-self.gradient, 0.1, max_energy)
             return self.energy
         else:
             self.energy = np.sum([child.setenergies(time) for child in self.children])
@@ -209,12 +212,14 @@ class ReLU_Scaler(nn.Module):
         return x * self.energy
     def update_energy(self, new_energy):
         with torch.no_grad():
-            self.energy.copy_(new_energy)
+            clipped_energy = torch.clamp(new_energy, min=0.7, max=1.5)
+            self.energy.copy_(clipped_energy)
 
 class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(3*32*32, num_hidden, bias=False)
+        self.dropout = nn.Dropout(0.5)
         self.fc1_ReLU_scaler = ReLU_Scaler(num_hidden)
         self.fc2 = nn.Linear(num_hidden, 10, bias=False)
         self.clip_value=clip_value
@@ -223,6 +228,7 @@ class Net(nn.Module):
     def forward(self, x):
         x = x.view(-1, 3 * 32 * 32)
         intermediate_output = F.relu(self.fc1(x))  # Intermediate output after first layer
+        intermediate_output = self.dropout(intermediate_output)
         intermediate_output = self.fc1_ReLU_scaler(intermediate_output)
         x = self.fc2(intermediate_output)
         # return F.log_softmax(x, dim=1), intermediate_output
@@ -252,15 +258,17 @@ class Net(nn.Module):
 
 
 model = Net().to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5, weight_decay=.001)
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5, weight_decay=0)
 # optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
 # print(type(model.children().next()))
-ANVN_N = ANVN(2,128)
+ANVN_N = ANVN(2,999999)
+ANVN_N.root.energy = 999999
 import numpy as np
 ANVN_N.root.forward()
 def train(epoch, log_interval=100):
     model.train()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     for batch_idx, (data, target) in enumerate(train_loader):
         data = data.to(device)
         target = target.to(device)
@@ -280,16 +288,39 @@ def train(epoch, log_interval=100):
         
         # Extract gradients for the middle layer (fc1)
         gradients_fc1 = model.fc1.weight.grad.detach().cpu().numpy().mean(1)
-        ANVN_N.root.backprop(gradients_fc1)
-        ANVN_forward = ANVN_N.root.forward()
+        
+        # Create a mask for non-zero values
+        # Create a mask for zero gradients
+        zero_mask = (gradients_fc1 == 0)
+        
+        # Avoid dividing by zero by setting zeros to a small positive value temporarily
+        gradients_fc1[zero_mask] = -1e-8  # Set a small value where gradients are zero
+        
+        # Invert the gradients
+        inverse_gradients = 1 / gradients_fc1
+        
+        # Set inverse of zero gradients back to zero
+        inverse_gradients[zero_mask] = 0
+        if inverse_gradients.mean() != 0:
+            inverse_gradients= inverse_gradients/inverse_gradients.mean()
+        # print(inverse_gradients)
+        
+        # Now you can use gradients_fc1_inverse safely
+        ANVN_N.root.backprop(inverse_gradients)
+        ANVN_forward = ANVN_N.root.forward(energy)
         ANVN_forward = torch.tensor(ANVN_forward)
         model.fc1_ReLU_scaler.update_energy(ANVN_forward)
-        model.clip_weights()
+        # model.clip_weights()
+        # if batch_idx == 0:
+        #     break
         if batch_idx % log_interval == 0:
+            
             # print(ANVN_N.root.forward())
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                         100. * batch_idx / len(train_loader), loss.data.item()))
+            print(ANVN_N.root.forward())
+            print(ANVN_N.root.forward().sum())
         
 def validate(loss_vector, accuracy_vector):
     model.eval()
@@ -301,7 +332,7 @@ def validate(loss_vector, accuracy_vector):
         val_loss += criterion(output, target).data.item()
         pred = output.data.max(1)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data).cpu().sum()
-        model.clip_weights()
+        # model.clip_weights()
 
     val_loss /= len(validation_loader)
     loss_vector.append(val_loss)
@@ -320,8 +351,9 @@ lossv, accv = [], []
 for epoch in range(1, epochs + 1):
     train(epoch)
     validate(lossv, accv)
-print(ANVN_N.root.forward())
-with open('ANVN.pkl', 'wb') as f:
+print(ANVN_N.root.forward(energy))
+print(ANVN_N.root.forward().sum())
+with open('ANVN_dr.pkl', 'wb') as f:
     pickle.dump(ANVN_N, f)
 
-torch.save(model.state_dict(), 'trained_model_cf_256_test!!!.pt')
+torch.save(model.state_dict(), 'trained_model_cf_256_test_dropout_sim oiujkyhygtgfre.pt')

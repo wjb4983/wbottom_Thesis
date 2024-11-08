@@ -1,8 +1,9 @@
 import pandas as pd
 
 # Load the Excel data
-data = pd.read_excel('ANVNSimultaneous_1n_root_bank_thresh1.xlsx')
-threshs = [1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, 35, 40, 45, 50]
+data = pd.read_excel('ANVNSimultaneous_updated.xlsx')
+# threshs = [1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, 35, 40, 45, 50]
+threshs = data['Max Energy'].unique()
 
 # Function to create a LaTeX table with combined accuracy and average spikes
 def create_latex_table(data, colored_func_name_acc):
@@ -12,7 +13,8 @@ def create_latex_table(data, colored_func_name_acc):
     num_max_energy = len(pivoted_data.index)
 
     # Start constructing the LaTeX table
-    table = "\\begin{center}\n"
+    table = "\\begin{table}\n"
+    table += "\\begin{center}\n"
     table += "\\begin{tabular}{|c|" + "|".join(["c"] * num_max_energy) + "|}\n"  
     table += "\\hline\n"
     
@@ -38,6 +40,9 @@ def create_latex_table(data, colored_func_name_acc):
     
     table += "\\end{tabular}\n"
     table += "\\end{center}\n"
+    table += "\caption{Accuracy of SNN with ANVN Simultaneously Trained (converted)}\n"
+    table += "\label{table:anvnsim}\n"
+    table += "\end{table}\n"
     return table
 
 

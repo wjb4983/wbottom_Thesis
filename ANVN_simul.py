@@ -149,3 +149,17 @@ class ANVN_Node():
             return 1 + self.children[0].getdepth()
     def clip(self):
         self.energy = np.clip(self.energy, 0, max_energy)
+    
+    def collect_energies_at_depth(self, depth, current_depth=0):
+        if current_depth == depth:
+            return [self.energy]
+        
+        if self.is_leaf:
+            return []
+        
+        # Recursively collect energies from children and concatenate results
+        energies = []
+        for child in self.children:
+            energies.extend(child.collect_energies_at_depth(depth, current_depth + 1))
+        
+        return energies

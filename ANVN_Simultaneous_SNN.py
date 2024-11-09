@@ -262,7 +262,7 @@ train_loader2 = torch.utils.data.DataLoader(dataset=train_dataset2,
 
 model = Net()
 
-model.load_state_dict(torch.load("trained_model_cf_256_simul_updated.pt"))
+model.load_state_dict(torch.load("trained_model_cf_256_test_dropout_sim oiujkyhygtgfre.pt"))
 # model.normalize_weights()
 # model = torch.load('trained_model.pt')
 

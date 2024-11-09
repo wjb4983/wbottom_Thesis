@@ -316,7 +316,7 @@ train_loader2 = torch.utils.data.DataLoader(dataset=train_dataset2,
 model = Net()
 
 model.load_state_dict(torch.load("trained_model_cf_256_simul_updated.pt"))
-# model.normalize_weights()
+model.normalize_weights()
 # model = torch.load('trained_model.pt')
 
 print()
@@ -548,7 +548,7 @@ if loop_max_energy:
             if energy != 0:
                 ANVN_N = ANVN(2,energy)
                 ANVN_N.root.clip()
-                with open('ANVN_updated.pkl', 'rb') as f:
+                with open('ANVN_dr.pkl', 'rb') as f:
                     ANVN_N = pickle.load(f)
                 ANVN_N.energy = energy
                 ANVN_N.root.energy=energy

@@ -20,7 +20,7 @@ loop_max_energy = True
 max_energies = [1,2,6,10,14,18,22,26,30,50]
 # max_energies = [1]
 # n=1
-nns = [1,2,5,10,50]
+nns = [2,3,5]
 
 
 from bindsnet.analysis.plotting import (
@@ -565,7 +565,7 @@ train_loader2 = torch.utils.data.DataLoader(dataset=train_dataset2,
 
 model = Net()
 
-model.load_state_dict(torch.load("trained_model_cf_256_test!!!.pt"))
+model.load_state_dict(torch.load("trained_model_cf_256_simul_updated.pt"))
 # model.normalize_weights()
 # model = torch.load('trained_model.pt')
 
@@ -769,9 +769,10 @@ print("="*30)
 
 # print("grad:",(neuron_spikes)-tree_output)
 # energies = [x for x in range(125,25,-25)]
-results = pd.DataFrame(columns=['Max Energy', 'Energy', 'SNN Accuracy', 'Average Spikes'])
+
 import pickle
 for n in nns:
+    results = pd.DataFrame(columns=['Max Energy', 'Energy', 'SNN Accuracy', 'Average Spikes'])
     if loop_max_energy:
         for me in max_energies: 
             print("0"*30)

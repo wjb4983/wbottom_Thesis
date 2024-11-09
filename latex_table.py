@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the Excel data
-data = pd.read_excel('ANVNSimultaneous_updated.xlsx')
+data = pd.read_excel('ANVNSequential_weight.xlsx')
 # threshs = [1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, 35, 40, 45, 50]
 threshs = data['Max Energy'].unique()
 
@@ -40,8 +40,8 @@ def create_latex_table(data, colored_func_name_acc):
     
     table += "\\end{tabular}\n"
     table += "\\end{center}\n"
-    table += "\caption{Accuracy of SNN with ANVN Simultaneously Trained (converted)}\n"
-    table += "\label{table:anvnsim}\n"
+    table += "\caption{Accuracy of SNN with ANVN Simultaneously Trained (converted), $n$=5 and Thresh=1}\n"
+    table += "\label{table:anvnsim_5n_rootbank_thresh1}\n"
     table += "\end{table}\n"
     return table
 

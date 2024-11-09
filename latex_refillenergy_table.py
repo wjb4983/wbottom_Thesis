@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the Excel data
-data = pd.read_excel('ANVNSimultaneous_root_bank_varyenergy_interreservoir.xlsx')
+data = pd.read_excel('ANVNSimultaneous_root_bank_varyenergy_interreservoir_layer6.xlsx')
 # threshs = [1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, 35, 40, 45, 50]
 threshs = data['Max Energy'].unique()
 
@@ -38,8 +38,8 @@ def create_latex_table(data, colored_func_name_acc, re):
     
     table += "\\end{tabular}\n"
     table += "\\end{center}\n"
-    table += "\caption{Accuracy of SNN with ANVN Simultaneously Trained (converted), Augmented Root Bank, and Thresholds Adjusted. Flows "+str(re)+" Energy Every $n=1$ Timesteps}\n"
-    table += "\label{table:anvnsim_rootbank_vary_energy_1n_" + str(re) + "re}\n"
+    table += "\caption{Accuracy of SNN with ANVN Simultaneously Trained (converted), Augmented Root Bank, and Thresholds Adjusted. Root Bank Starts With "+str(re)+" Energy.  Intermediate Reservoir at Layer 6}\n"
+    table += "\label{table:anvnsim_rootbank_vary_energy_6l_" + str(re) + "re}\n"
     table += "\end{table}\n"
     return table
 

@@ -13,7 +13,7 @@ import types
 
 batch_size=255
 num_hidden=512
-max_energy=9
+max_energy=10
 verbose=0
 plot=0
 loop_max_energy = True

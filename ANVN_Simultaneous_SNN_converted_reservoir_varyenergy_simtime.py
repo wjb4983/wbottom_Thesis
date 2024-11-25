@@ -17,8 +17,8 @@ max_energy=10
 verbose=0
 plot=0
 loop_max_energy = True
-max_energies = [4,8,12,14,16,18,20,22,24,26,28,30,35]
-nns = [1,2,5]
+max_energies = [17]
+nns = [1]#,2,5]
 
 from bindsnet.analysis.plotting import (
     plot_assignments,
@@ -766,7 +766,7 @@ print("="*30)
 
 # print("grad:",(neuron_spikes)-tree_output)
 # energies = [x for x in range(125,25,-25)]
-times = [40,60,80]
+times = [40]
 for time in times:
     SNN.add_monitor(
         Monitor(SNN.layers['3'], state_vars=['v'], time=time), name='3'
@@ -787,8 +787,8 @@ for time in times:
                 print("Max Energy -", me)
                 # energies = [0,1,32,128,256,512,1024]
                 # energies = [0]
-                energies = [x for x in range(250, 800, 50)]
-                refill_energies = [x for x in range(100, 3000, 300)]
+                energies = [x for x in range(50, 800, 100)]
+                refill_energies = [x for x in range(100, 1000, 100)]
                 for energy in energies:
                     for re in refill_energies:
                         SNN_copy = deepcopy(SNN)

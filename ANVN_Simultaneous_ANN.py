@@ -260,7 +260,11 @@ class Net(nn.Module):
 
 
 model = Net().to(device)
+<<<<<<< HEAD
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.5, weight_decay=0)
+=======
+optimizer = optim.SGD(model.parameters(), lr=0.0004, momentum=0.99, weight_decay=0)
+>>>>>>> 6767a0763e32e783dca80aba54240fff91f358cd
 # optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
 # print(type(model.children().next()))
@@ -317,12 +321,21 @@ def train(epoch, log_interval=100):
         # #     break
         # if batch_idx % log_interval == 0:
             
+<<<<<<< HEAD
         #     # print(ANVN_N.root.forward())
         #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
         #         epoch, batch_idx * len(data), len(train_loader.dataset),
         #                 100. * batch_idx / len(train_loader), loss.data.item()))
         #     print(ANVN_N.root.forward())
         #     print(ANVN_N.root.forward().sum())
+=======
+            # print(ANVN_N.root.forward())
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                        100. * batch_idx / len(train_loader), loss.data.item()))
+            # print(ANVN_N.root.forward())
+            # print(ANVN_N.root.forward().sum())
+>>>>>>> 6767a0763e32e783dca80aba54240fff91f358cd
         
 def validate(loss_vector, accuracy_vector):
     model.eval()

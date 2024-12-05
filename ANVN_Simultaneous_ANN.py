@@ -258,7 +258,7 @@ class Net(nn.Module):
 
 
 model = Net().to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5, weight_decay=0)
+optimizer = optim.SGD(model.parameters(), lr=0.0004, momentum=0.99, weight_decay=0)
 # optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
 # print(type(model.children().next()))
@@ -319,8 +319,8 @@ def train(epoch, log_interval=100):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                         100. * batch_idx / len(train_loader), loss.data.item()))
-            print(ANVN_N.root.forward())
-            print(ANVN_N.root.forward().sum())
+            # print(ANVN_N.root.forward())
+            # print(ANVN_N.root.forward().sum())
         
 def validate(loss_vector, accuracy_vector):
     model.eval()

@@ -652,82 +652,7 @@ baseline_mv = 0
 neuron_spikes = 0
 
 net_spikes
-# for index, (data, target) in enumerate(train_loader):
-#     # if index * batch_size > 100:
-#         # break
-#     start = t_()
-#     # print(index*batch_size)
-#     # if index > 100:
-#     #     break
-#     num_data +=100
-#     # print('sample ', index+1, 'elapsed', t_() - start)
-#     start = t_()
 
-#     data = data.to(device)
-#     data = data.view(-1, 3*32*32)
-#     # print(data.shape)
-#     inpts = {'Input': data.repeat(time, 1, 1)}
-#     # print(inpts["Input"].shape)
-#     # print(inpts["Input"].shape)
-#     # print(inpts["Input"].shape)
-#     SNN.run(inputs=inpts, time=time)
-#     s = {layer: SNN.monitors[f'{layer}_spikes'].get('s') for layer in SNN.layers}
-#     voltages = {layer: SNN.monitors[layer].get('v') for layer in ['3'] if not layer == 'Input'}
-#     # pred = torch.argmax(voltages['2'].sum(1))
-#     # summed_voltages = voltages['2'].sum(0)
-#     # print(summed_voltages.shape)
-#     # print(s['2'].shape)
-#     neuron_spikes += s['1'].sum((0,1))
-#     summed_spikes=s['3'].sum(0)
-#     # print(summed_spikes)
-#     net_spikes += summed_spikes.sum()+ s['1'].sum()
-#     # pred = torch.argmax(summed_voltages, dim=1).to(device)
-#     pred = torch.argmax(summed_spikes, dim=1).to(device)
-#     # print(pred, target)
-#     # correct += pred.eq(target.data.to(device)).cpu().sum()
-#     # print(pred)
-#     # print(target)
-#     correct += pred.eq(target).sum().item()
-#     # if index == 0:
-#     #     ciu = calculate_intermediate_usefulness(s['1'], SNN.connections["1","2"].w, target, time)
-#     # else:
-#     #     ciu += calculate_intermediate_usefulness(s['1'], SNN.connections["1","2"].w, target, time)
-#     # spikes_ = {
-#     #     layer: spikes[layer].get("s")[:].contiguous() for layer in spikes
-    
-#     # }
-#     # # print("Curr time", t_() - start)
-#     # spikes_ = {
-#     #     layer: spikes[layer].get("s")[:, 0].contiguous() for layer in spikes
-#     # }
-#     # keys = list(spikes_.keys())
-#     # for i in range(0, len(keys), 2):
-#     #     # Get two consecutive layers from spikes_
-        
-#     #     layer1_key = keys[i]
-#     #     layer2_key = keys[i + 1] if i + 1 < len(keys) else None
-        
-#     #     # Get the spike data for the current layers
-#     #     layer1_spikes = spikes_[layer1_key]
-#     #     layer2_spikes = spikes_[layer2_key] if layer2_key else None
-#     #     if(layer2_spikes == None):
-#     #         ims[i], axes[i] = plot_spikes(
-#     #             {layer1_key: layer1_spikes},
-#     #             ims=ims[i], axes=axes[i]
-#     #         )
-#     #     else:
-#     #         ims[i], axes[i] = plot_spikes(
-#     #             {layer1_key: layer1_spikes, layer2_key: layer2_spikes},
-#     #             ims=ims[i], axes=axes[i]
-#     #         )
-#     #     for ax in axes[i]:
-#     #         ax.xaxis.set_major_locator(MultipleLocator(20))
-#     #         ax.set_xlim(0,100)
-#     # voltage_ims, voltage_axes = plot_voltages(
-#     #     voltages, ims=voltage_ims, axes=voltage_axes, plot_type="line"
-#     # )
-#     SNN.reset_state_variables()
-    
 if num_data>0:
     SNN_accuracy = 100.0 * float(correct) / float(num_data)
     print("Net spikes: ", net_spikes/num_data)
@@ -749,9 +674,8 @@ print("Net spikes: ", net_spikes)
 
 print("ANVN")
 print("="*30)
-# neg_indices = ciu < 0
-# neuron_spikes = 2*neuron_spikes - 1
 
+<<<<<<< HEAD
 #We want a larger number to mean more energy
 #We can convert energy to "lowering threshold" later
 # neuron_spikes = - (neuron_spikes-1)
@@ -767,6 +691,9 @@ print("="*30)
 # print("grad:",(neuron_spikes)-tree_output)
 # energies = [x for x in range(125,25,-25)]
 times = [10]
+=======
+times = [20]
+>>>>>>> a1b5553f2ea75b6dd33dfebb5f391d9625543a45
 for time in times:
     SNN.add_monitor(
         Monitor(SNN.layers['3'], state_vars=['v'], time=time), name='3'
@@ -850,11 +777,11 @@ for time in times:
                             num_data2 +=batch_size
                             # print('sample ', index+1, 'elapsed', t_() - start)
                             start = t_()
-                        
+                            print(data.shape)
                             data = data.to(device)
                             data = data.view(-1, 3*32*32)
                             inpts = {'Input': data.repeat(time,1, 1)}
-                            # print(inpts["Input"].shape)
+                            print(inpts["Input"].shape)
                             SNN_copy.run(inputs=inpts, time=time)
                             s = {layer: SNN_copy.monitors[f'{layer}_spikes'].get('s') for layer in SNN_copy.layers}
                             voltages = {layer: SNN_copy.monitors[layer].get('v') for layer in ['3'] if not layer == 'Input'}

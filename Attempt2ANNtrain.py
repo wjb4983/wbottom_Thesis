@@ -66,7 +66,7 @@ class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(3*32*32, 512, bias=False)
-        self.dropout = nn.Dropout(0.5)
+        # self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(512, 10, bias=False)
         self.clip_value=clip_value
 
@@ -74,7 +74,7 @@ class Net(nn.Module):
     def forward(self, x):
             x = x.view(-1, 3*32*32)
             x = F.relu(self.fc1(x))
-            x = self.dropout(x)
+            # x = self.dropout(x)
             x = self.fc2(x)
             return F.log_softmax(x)
     def clip_weights(self):
@@ -123,6 +123,7 @@ def train(epoch, log_interval=100):
         print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
             epoch, batch_idx * len(data), len(train_loader.dataset),
                    100. * batch_idx / len(train_loader), loss.data.item()))
+ torch.save(model.state_dict(), 'trained_model_cf_512_dropout_seq.pt')
         
 def validate(loss_vector, accuracy_vector):
     model.eval()
@@ -155,4 +156,3 @@ for epoch in range(1, epochs + 1):
     validate(lossv, accv)
 
 
-torch.save(model.state_dict(), 'trained_model_cf_512_dropout_seq.pt')

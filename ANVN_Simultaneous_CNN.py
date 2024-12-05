@@ -218,24 +218,47 @@ class ReLU_Scaler(nn.Module):
 class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 12, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(12, 36, kernel_size=3, padding=1)
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2) 
-        self.fc1 = nn.Linear(2304, num_hidden, bias=False)
-        self.dropout = nn.Dropout(0.5)
-        self.fc1_ReLU_scaler = ReLU_Scaler(num_hidden)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv1 = nn.Conv2d(3, 12, kernel_size=3)#, padding=1)
+        self.conv2 = nn.Conv2d(12, 24, kernel_size=3)#, padding=1)
+        self.conv3 = nn.Conv2d(24, 36, kernel_size=3)
+        # self.conv3 = nn.Conv2d(9, 3, kernel_size=3)
+        # self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2) 
+        self.fc1 = nn.Linear(24336, num_hidden, bias=False)
+        # self.dropout = nn.Dropout(0.5)
+        # self.fc1_ReLU_scaler = ReLU_Scaler(num_hidden)
+        # self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.fc2 = nn.Linear(num_hidden, 10, bias=False)
         self.clip_value=clip_value
+    # def __init__(self):
+    #     super(Net, self).__init__()
+    #     self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1)  # Downsample using stride
+    #     self.conv2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+    #     self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)  # Downsample using stride
+    #     self.conv4 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+    #     self.conv5 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)  # Downsample using stride
+    #     self.fc1 = nn.Linear(128 * 4 * 4, 256, bias=False)  # First fully connected layer
+    #     self.fc2 = nn.Linear(256, 10, bias=False)  # Output layer (10 classes for CIFAR-10)
+
+    # def forward(self, x):
+    #     x = F.relu(self.conv1(x))  # Apply ReLU to the first convolutional layer
+    #     x = F.relu(self.conv2(x))  # Apply ReLU to the second convolutional layer
+    #     x = F.relu(self.conv3(x))  # Apply ReLU to the third convolutional layer
+    #     x = F.relu(self.conv4(x))
+    #     x = F.relu(self.conv5(x))
+    #     x = x.view(x.size(0), -1)  # Flatten for the fully connected layers
+    #     x = F.relu(self.fc1(x))  # Apply ReLU to the first fully connected layer
+    #     x = self.fc2(x)  # Final output layer (logits)
+    #     return x
 
 
     def forward(self, x):
-        x = self.pool1(F.relu(self.conv1(x)))
-        x = self.pool2(F.relu(self.conv2(x)))
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
         x = x.view(x.size(0), -1)
         intermediate_output = F.relu(self.fc1(x))  # Intermediate output after first layer
         # intermediate_output = self.dropout(intermediate_output)
-        intermediate_output = self.fc1_ReLU_scaler(intermediate_output)
+        # intermediate_output = self.fc1_ReLU_scaler(intermediate_output)
         x = self.fc2(intermediate_output)
         # return F.log_softmax(x, dim=1), intermediate_output
         return F.log_softmax(x), intermediate_output
@@ -264,6 +287,7 @@ class Net(nn.Module):
 
 
 model = Net().to(device)
+print("# parameters", sum(p.numel() for p in model.parameters()))
 optimizer = optim.SGD(model.parameters(), lr=0.025, momentum=0.5, weight_decay=0)
 # optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
@@ -312,10 +336,10 @@ def train(epoch, log_interval=100):
         # print(inverse_gradients)
         
         # Now you can use gradients_fc1_inverse safely
-        ANVN_N.root.backprop(inverse_gradients)
-        ANVN_forward = ANVN_N.root.forward(energy)
-        ANVN_forward = torch.tensor(ANVN_forward)
-        model.fc1_ReLU_scaler.update_energy(ANVN_forward)
+        # ANVN_N.root.backprop(inverse_gradients)
+        # ANVN_forward = ANVN_N.root.forward(energy)
+        # ANVN_forward = torch.tensor(ANVN_forward)
+        # model.fc1_ReLU_scaler.update_energy(ANVN_forward)
         # model.clip_weights()
         # if batch_idx == 0:
         #     break
@@ -334,7 +358,7 @@ def validate(loss_vector, accuracy_vector):
     for data, target in validation_loader:
         data = data.to(device)
         target = target.to(device)
-        output,_ = model(data)
+        output, _ = model(data)
         val_loss += criterion(output, target).data.item()
         pred = output.data.max(1)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data).cpu().sum()

@@ -218,18 +218,20 @@ class ReLU_Scaler(nn.Module):
 class Net(nn.Module):
     def __init__(self, reg_strength=0.01, clip_value=1.0):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(3*32*32, num_hidden, bias=False)
-        self.dropout = nn.Dropout(0.5)
-        self.fc1_ReLU_scaler = ReLU_Scaler(num_hidden)
+        self.input = nn.Linear(3*32*32, 50, bias=False)
+        self.fc1 = nn.Linear(50, num_hidden, bias=False)
+        # self.dropout = nn.Dropout(0.5)
+        # self.fc1_ReLU_scaler = ReLU_Scaler(num_hidden)
         self.fc2 = nn.Linear(num_hidden, 10, bias=False)
         self.clip_value=clip_value
 
 
     def forward(self, x):
         x = x.view(-1, 3 * 32 * 32)
+        x = F.relu(self.input(x))
         intermediate_output = F.relu(self.fc1(x))  # Intermediate output after first layer
-        intermediate_output = self.dropout(intermediate_output)
-        intermediate_output = self.fc1_ReLU_scaler(intermediate_output)
+        # intermediate_output = self.dropout(intermediate_output)
+        # intermediate_output = self.fc1_ReLU_scaler(intermediate_output)
         x = self.fc2(intermediate_output)
         # return F.log_softmax(x, dim=1), intermediate_output
         return F.log_softmax(x), intermediate_output
@@ -258,7 +260,7 @@ class Net(nn.Module):
 
 
 model = Net().to(device)
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.5, weight_decay=0)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.5, weight_decay=0)
 # optimizer = optim.Adam(model.parameters(), lr = 0.01)
 criterion = nn.CrossEntropyLoss()
 # print(type(model.children().next()))
@@ -286,41 +288,41 @@ def train(epoch, log_interval=100):
         
         optimizer.step()
         
-        # Extract gradients for the middle layer (fc1)
-        gradients_fc1 = model.fc1.weight.grad.detach().cpu().numpy().mean(1)
+        # # Extract gradients for the middle layer (fc1)
+        # gradients_fc1 = model.fc1.weight.grad.detach().cpu().numpy().mean(1)
         
-        # Create a mask for non-zero values
-        # Create a mask for zero gradients
-        zero_mask = (gradients_fc1 == 0)
+        # # Create a mask for non-zero values
+        # # Create a mask for zero gradients
+        # zero_mask = (gradients_fc1 == 0)
         
-        # Avoid dividing by zero by setting zeros to a small positive value temporarily
-        gradients_fc1[zero_mask] = -1e-8  # Set a small value where gradients are zero
+        # # Avoid dividing by zero by setting zeros to a small positive value temporarily
+        # gradients_fc1[zero_mask] = -1e-8  # Set a small value where gradients are zero
         
-        # Invert the gradients
-        inverse_gradients = 1 / gradients_fc1
+        # # Invert the gradients
+        # inverse_gradients = 1 / gradients_fc1
         
-        # Set inverse of zero gradients back to zero
-        inverse_gradients[zero_mask] = 0
-        if inverse_gradients.mean() != 0:
-            inverse_gradients= inverse_gradients/inverse_gradients.mean()
-        # print(inverse_gradients)
+        # # Set inverse of zero gradients back to zero
+        # inverse_gradients[zero_mask] = 0
+        # if inverse_gradients.mean() != 0:
+        #     inverse_gradients= inverse_gradients/inverse_gradients.mean()
+        # # print(inverse_gradients)
         
-        # Now you can use gradients_fc1_inverse safely
-        ANVN_N.root.backprop(inverse_gradients)
-        ANVN_forward = ANVN_N.root.forward(energy)
-        ANVN_forward = torch.tensor(ANVN_forward)
-        model.fc1_ReLU_scaler.update_energy(ANVN_forward)
-        # model.clip_weights()
-        # if batch_idx == 0:
-        #     break
-        if batch_idx % log_interval == 0:
+        # # Now you can use gradients_fc1_inverse safely
+        # ANVN_N.root.backprop(inverse_gradients)
+        # ANVN_forward = ANVN_N.root.forward(energy)
+        # ANVN_forward = torch.tensor(ANVN_forward)
+        # model.fc1_ReLU_scaler.update_energy(ANVN_forward)
+        # # model.clip_weights()
+        # # if batch_idx == 0:
+        # #     break
+        # if batch_idx % log_interval == 0:
             
-            # print(ANVN_N.root.forward())
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                        100. * batch_idx / len(train_loader), loss.data.item()))
-            print(ANVN_N.root.forward())
-            print(ANVN_N.root.forward().sum())
+        #     # print(ANVN_N.root.forward())
+        #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+        #         epoch, batch_idx * len(data), len(train_loader.dataset),
+        #                 100. * batch_idx / len(train_loader), loss.data.item()))
+        #     print(ANVN_N.root.forward())
+        #     print(ANVN_N.root.forward().sum())
         
 def validate(loss_vector, accuracy_vector):
     model.eval()
